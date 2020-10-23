@@ -4,14 +4,14 @@
 
 
 
-	<robot name="panda_collision">
-		<model dir="./resources" path="panda_collision.urdf" name="panda_collision" />
-		<origin xyz="-2.0 5 0.0" rpy="0 0 0" />
+	<robot name="mmp_panda">
+		<model dir="./resources" path="mmp_panda.urdf" name="mmp_panda" />
+		<origin xyz="-.1 1.5 .5" rpy="0 0 0" />
 	</robot>
 
 	<robot name="ball">
 		<model dir="./resources" path="tennisBall.urdf" name="ball" />
-		<origin xyz="-1 1.5 2" rpy="0 0 0" />
+		<origin xyz="-1 1.5 3" rpy="0 0 0" />
 
 	</robot>
 
@@ -27,7 +27,7 @@
 	    	<origin xyz="0.0 0.0 -0.1" rpy="0 0 0" />
 	        <origin xyz="0.0 0.0 -0.0001" rpy="0 0 0" />
 	        <geometry>
-	            <mesh filename="./resources/../../../model/test_objects/meshes/visual/court.obj" scale="1.0 1.0 1.0"/>
+	            <mesh filename="./resources/../../../CS225a_TennisBot/Objects/Visual/court.obj" scale="1.0 1.0 1.0"/>
 	            <box size="10 10 0.0002" />
 	        </geometry>
 	        <material name="material">

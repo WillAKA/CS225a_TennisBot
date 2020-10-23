@@ -20,9 +20,9 @@ using namespace Eigen;
 
 // specify urdf and robots 
 const string world_file = "./resources/world.urdf";
-const string robot_file = "./resources/panda_collision.urdf";
+const string robot_file = "./resources/mmp_panda.urdf";
 const string obj_file = "./resources/tennisBall.urdf";
-const string robot_name = "panda_collision";
+const string robot_name = "mmp_panda";
 const string obj_name = "ball"; 
 const string camera_name = "camera_fixed";
 const string ee_link_name = "link7";
@@ -118,7 +118,7 @@ int main() {
 
     // set co-efficient of restition to zero for force control
     // see issue: https://github.com/manips-sai/sai2-simulation/issues/1
-    sim->setCollisionRestitution(0.0);
+    sim->setCollisionRestitution(0.759);
 
     // set co-efficient of friction also to zero for now as this causes jitter
     // sim->setCoeffFrictionStatic(0.0);
