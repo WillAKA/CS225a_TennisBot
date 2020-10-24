@@ -110,9 +110,9 @@
 	</light>
 
 	<camera name="camera_fixed">
-		<position xyz="2.0 -1.2 3" />
+		<position xyz="15.0 -2 5" />
 		<vertical xyz="0.0 0.0 1.0" />
-		<lookat xyz="0.0 1.5 1" />  
+		<lookat xyz="0.0 0.0 1" />  
 		<!-- <position xyz="0.1 0.3 5.0" />
 		<vertical xyz="0.0 0.0 1.0" />
 		<lookat xyz="0.0 0.3 0.0" /> -->

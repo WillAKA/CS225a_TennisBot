@@ -20,17 +20,17 @@ void sighandler(int){fSimulationRunning = false;}
 using namespace std;
 using namespace Eigen;
 
-const string world_file = "./resources/world.urdf";
-const string robot_file = "./resources/mmp_panda.urdf";
-const string robot_name = "mmp_panda";
+const string world_file = "./resources/world_panda.urdf";
+const string robot_file = "./resources/panda_arm.urdf";
+const string robot_name = "panda_arm";
 const string camera_name = "camera_fixed";
 
 // redis keys:
 // - write:
-const std::string JOINT_ANGLES_KEY = "sai2::cs225a::project::panda::sensors::q";
-const std::string JOINT_VELOCITIES_KEY = "sai2::cs225a::project::panda::sensors::dq";
+const std::string JOINT_ANGLES_KEY = "sai2::cs225a::project::sensors::q";
+const std::string JOINT_VELOCITIES_KEY = "sai2::cs225a::project::sensors::dq";
 // - read
-const std::string JOINT_TORQUES_COMMANDED_KEY = "sai2::cs225a::project::panda::actuators::fgc";
+const std::string JOINT_TORQUES_COMMANDED_KEY = "sai2::cs225a::project::actuators::fgc";
 
 RedisClient redis_client;
 
@@ -82,7 +82,7 @@ int main() {
 
 	// load simulation world
 	auto sim = new Simulation::Sai2Simulation(world_file, false);
-	sim->setCollisionRestitution(0.759);
+	sim->setCollisionRestitution(0);
 	sim->setCoeffFrictionStatic(0.6);
 
 	// read joint positions, velocities, update model
@@ -210,7 +210,6 @@ int main() {
 			camera_pos = camera_lookat + m_pan*(camera_pos - camera_lookat);
 		}
 		graphics->setCameraPose(camera_name, camera_pos, cam_up_axis, camera_lookat);
-		graphics->getCamera(camera_name)->setClippingPlanes(1,20);
 		glfwGetCursorPos(window, &last_cursorx, &last_cursory);
 
 		ui_force_widget->setEnable(fRobotLinkSelect);
