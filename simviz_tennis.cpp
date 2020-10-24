@@ -259,6 +259,7 @@ int main() {
 			camera_pos = camera_lookat + m_pan*(camera_pos - camera_lookat);
 		}
 		graphics->setCameraPose(camera_name, camera_pos, cam_up_axis, camera_lookat);
+		graphics->getCamera(camera_name)->setClippingPlanes(1,20);
 		glfwGetCursorPos(window, &last_cursorx, &last_cursory);
 
 		ui_force_widget->setEnable(fRobotLinkSelect);
