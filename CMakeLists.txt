@@ -1,11 +1,16 @@
+# - SAI2-URDF
+find_package(SAI2-PRIMITIVES REQUIRED)
+include_directories(${SAI2-PRIMITIVES_INCLUDE_DIRS})
+add_definitions(${SAI2-PRIMITIVES_DEFINITIONS})
+
 # create an executable
 set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CS225A_BINARY_DIR}/CS225a_TennisBot)
 ADD_EXECUTABLE (simviz_tennis simviz_tennis.cpp ${CS225A_COMMON_SOURCE})
 ADD_EXECUTABLE (controller_tennis controller_tennis.cpp ${CS225A_COMMON_SOURCE})
 
 # and link the library against the executable
-TARGET_LINK_LIBRARIES (simviz_tennis ${CS225A_COMMON_LIBRARIES})
-TARGET_LINK_LIBRARIES (controller_tennis ${CS225A_COMMON_LIBRARIES})
+TARGET_LINK_LIBRARIES (controller_tennis ${CS225A_COMMON_LIBRARIES} ${SAI2-PRIMITIVES_LIBRARIES})
+TARGET_LINK_LIBRARIES (simviz_tennis ${CS225A_COMMON_LIBRARIES} ${SAI2-PRIMITIVES_LIBRARIES})
 
 # export resources such as model files.
 # NOTE: this requires an install build
