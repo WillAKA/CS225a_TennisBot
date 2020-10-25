@@ -21,16 +21,16 @@ using namespace std;
 using namespace Eigen;
 
 const string world_file = "./resources/world.urdf";
-const string robot_file = "./resources/mmp_panda.urdf";
-const string robot_name = "mmp_panda";
+const string robot_file = "./resources/panda_collision.urdf";
+const string robot_name = "panda_collision";
 const string camera_name = "camera_fixed";
 
 // redis keys:
 // - write:
-const std::string JOINT_ANGLES_KEY = "sai2::cs225a::project::panda::sensors::q";
-const std::string JOINT_VELOCITIES_KEY = "sai2::cs225a::project::panda::sensors::dq";
+const std::string JOINT_ANGLES_KEY = "sai2::cs225a::project::sensors::q";
+const std::string JOINT_VELOCITIES_KEY = "sai2::cs225a::project::sensors::dq";
 // - read
-const std::string JOINT_TORQUES_COMMANDED_KEY = "sai2::cs225a::project::panda::actuators::fgc";
+const std::string JOINT_TORQUES_COMMANDED_KEY = "sai2::cs225a::project::actuators::fgc";
 
 RedisClient redis_client;
 
@@ -264,7 +264,7 @@ void simulation(Sai2Model::Sai2Model* robot, Simulation::Sai2Simulation* sim, UI
 	// create a timer
 	LoopTimer timer;
 	timer.initializeTimer();
-	timer.setLoopFrequency(1000); 
+	timer.setLoopFrequency(300); 
 	double last_time = timer.elapsedTime(); //secs
 	bool fTimerDidSleep = true;
 
