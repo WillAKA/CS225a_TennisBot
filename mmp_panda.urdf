@@ -181,6 +181,24 @@
     </collision> -->
   </link>
 
+  <link name="racquetlink">
+    <inertial>
+      <origin xyz="0 -0 0" rpy="0 -0 0" />
+      <mass value=".3203496" />
+      <inertia ixx="0.3" iyy="0.3" izz="0.3" ixy="0" ixz="0" iyz="0" />
+    </inertial>
+    <visual>
+      <geometry>
+        <mesh filename="../../../cs225a/CS225a_TennisBot/Objects/Visual/TennisRacquet.obj"/>
+      </geometry>
+    </visual>
+    <!-- <collision>
+      <geometry>
+        <mesh filename="../../../model/panda/meshes/collision/link2.obj"/>
+      </geometry>
+    </collision> -->
+    </link>
+
 
   <!-- JOINTS -->
   <joint name = "base_prismatic_x" type = "prismatic">
