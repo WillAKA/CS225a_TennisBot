@@ -107,7 +107,7 @@ int main() {
 	// create a timer
 	LoopTimer timer;
 	timer.initializeTimer();
-	timer.setLoopFrequency(300); 
+	timer.setLoopFrequency(1000); 
 	double start_time = timer.elapsedTime(); //secs
 	bool fTimerDidSleep = true;
 
@@ -142,9 +142,9 @@ int main() {
 				//posori_task->_desired_orientation = AngleAxisd(M_PI/6, Vector3d::UnitX()).toRotationMatrix() * posori_task->_desired_orientation;
 
 				joint_task->reInitializeTask();
-				joint_task->_kp = 0;
+				joint_task->_kp = 10;
 
-				q_init_desired[0] = -1;
+				q_init_desired[0] = -2;
 				joint_task->_desired_position = q_init_desired;
 
 				state = POSORI_CONTROLLER;
