@@ -4,8 +4,8 @@
 
 
 
-	<robot name="panda_collision">
-		<model dir="./resources" path="panda_collision.urdf" name="mmp_panda" />
+	<robot name="mmp_panda">
+		<model dir="./resources" path="mmp_panda.urdf" name="mmp_panda" />
 		<origin xyz="-.1 1.5 .5" rpy="0 0 0" />
 	</robot>
 
