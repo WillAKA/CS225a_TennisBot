@@ -18,7 +18,7 @@ void sighandler(int sig)
 using namespace std;
 using namespace Eigen;
 
-const string robot_file = "./resources/panda_arm.urdf";
+const string robot_file = "./resources/mmp_panda.urdf";
 
 #define JOINT_CONTROLLER      0
 #define POSORI_CONTROLLER     1
@@ -70,7 +70,7 @@ int main() {
 
 	// pose task
 	const string control_link = "link7";
-	const Vector3d control_point = Vector3d(0,0,0.07);
+	const Vector3d control_point = Vector3d(0.0,0.0,0.05);
 	auto posori_task = new Sai2Primitives::PosOriTask(robot, control_link, control_point);
 
 #ifdef USING_OTG
@@ -99,7 +99,8 @@ int main() {
 	joint_task->_kv = 15.0;
 
 	VectorXd q_init_desired = initial_q;
-	q_init_desired << -30.0, -15.0, -15.0, -105.0, 0.0, 90.0, 45.0;
+	q_init_desired << 0.0,0.0,0.0, -30.0, -15.0, -15.0, -105.0, 0.0, 90.0, 45.0;
+	//q_init_desired << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
 	q_init_desired *= M_PI/180.0;
 	joint_task->_desired_position = q_init_desired;
 
@@ -124,6 +125,7 @@ int main() {
 	
 		if(state == JOINT_CONTROLLER)
 		{
+			//cout <<"hello\n\r";			
 			// update task model and set hierarchy
 			N_prec.setIdentity();
 			joint_task->updateTaskModel(N_prec);
@@ -136,11 +138,13 @@ int main() {
 			if( (robot->_q - q_init_desired).norm() < 0.15 )
 			{
 				posori_task->reInitializeTask();
-				posori_task->_desired_position += Vector3d(-0.1,0.1,0.1);
-				posori_task->_desired_orientation = AngleAxisd(M_PI/6, Vector3d::UnitX()).toRotationMatrix() * posori_task->_desired_orientation;
+				posori_task->_desired_position += Vector3d(-0,0.1,-0.1);
+				//posori_task->_desired_orientation = AngleAxisd(M_PI/6, Vector3d::UnitX()).toRotationMatrix() * posori_task->_desired_orientation;
 
 				joint_task->reInitializeTask();
-				joint_task->_kp = 0;
+				joint_task->_kp = 10;
+
+				
 
 				state = POSORI_CONTROLLER;
 			}
@@ -148,6 +152,7 @@ int main() {
 
 		else if(state == POSORI_CONTROLLER)
 		{
+			//cout << "Bye\n\r";			
 			// update task model and set hierarchy
 			N_prec.setIdentity();
 			posori_task->updateTaskModel(N_prec);
@@ -159,9 +164,13 @@ int main() {
 			joint_task->computeTorques(joint_task_torques);
 
 			command_torques = posori_task_torques + joint_task_torques;
+			
+			
+			
 		}
 
 		// send to redis
+		//cout << "Command torques   :\n\r" << command_torques << "\n\r\n\r";
 		redis_client.setEigenMatrixJSON(JOINT_TORQUES_COMMANDED_KEY, command_torques);
 
 		controller_counter++;
