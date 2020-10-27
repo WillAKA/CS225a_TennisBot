@@ -138,14 +138,13 @@ int main() {
 			if( (robot->_q - q_init_desired).norm() < 0.15 )
 			{
 				posori_task->reInitializeTask();
-				posori_task->_desired_position += Vector3d(-2,0.1,-0.1);
+				posori_task->_desired_position += Vector3d(-0,0.1,-0.1);
 				//posori_task->_desired_orientation = AngleAxisd(M_PI/6, Vector3d::UnitX()).toRotationMatrix() * posori_task->_desired_orientation;
 
 				joint_task->reInitializeTask();
 				joint_task->_kp = 10;
 
-				q_init_desired[0] = -2;
-				joint_task->_desired_position = q_init_desired;
+				
 
 				state = POSORI_CONTROLLER;
 			}
