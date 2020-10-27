@@ -1,7 +1,7 @@
 # Blender MTL File: 'TennisRacquet.blend'
 # Material Count: 3
 
-newmtl Material.002
+newmtl Frame_Design
 Ns 225.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.800000 0.800000 0.800000
@@ -12,7 +12,7 @@ d 1.000000
 illum 2
 map_Kd Wilson_Blade_98_18x20.jpg
 
-newmtl Material.003
+newmtl Handle
 Ns 225.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.800000 0.800000 0.800000
@@ -23,7 +23,7 @@ d 1.000000
 illum 2
 map_Kd Wilson_Blade_98_18x20.jpg
 
-newmtl Material.004
+newmtl String_Color
 Ns 225.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.008831 0.800000 0.019212
@@ -31,4 +31,4 @@ Ks 0.500000 0.500000 0.500000
 Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
-illum 2
+map_Kd 17e726.png

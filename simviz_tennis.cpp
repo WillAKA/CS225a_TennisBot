@@ -5,10 +5,10 @@
 #include <dynamics3d.h>
 #include "redis/RedisClient.h"
 #include "timer/LoopTimer.h"
-
 #include <GLFW/glfw3.h> //must be loaded after loading opengl/glew
-
 #include "uiforce/UIForceWidget.h"
+#include "force_sensor/ForceSensorSim.h"  // references src folder in sai2-common directory 
+#include "force_sensor/ForceSensorDisplay.h"
 
 #include <iostream>
 #include <string>
