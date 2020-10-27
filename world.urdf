@@ -36,8 +36,28 @@
 	    </visual>
 	</static_object>
 
+	<static_object name="Net">
+		<origin xyz="0.0 0.0 0.0" rpy="0 0 0" />
+		<!-- <collision>
+	        <origin xyz="0.0 0.0 -0.0001" rpy="0 0 0" />
+	        <geometry>
+	            <mesh filename="./resources/../../../CS225a_TennisBot/Objects/Visual/TennisNetCollisionMesh.obj" scale="1.0 1.0 1.0"/>
+	        </geometry>
+	    </collision> -->
+	    <visual>
+	    	<!-- <origin xyz="0.0 0.0 -0.1" rpy="0 0 0" /> -->
+	        <origin xyz="0.0 0.0 -0.0001" rpy="0 0 1.57079632679" />
+	        <geometry>
+	            <mesh filename="./resources/../../../CS225a_TennisBot/Objects/Visual/TennisNet.obj" scale="1.0 1.0 1.0"/>
+	        </geometry>
+	        <!-- <material name="material">
+		        <texture filename="./resources/../../../CS225a_TennisBot/Objects/Visual/TennisNet.mtl"/>
+	        </material> -->
+	    </visual>
+	</static_object>
 
-	<static_object name="Companion_Cube">
+
+	<!-- <static_object name="Companion_Cube">
 		<origin xyz="0.0 0.0 0.5" rpy="0 0 0" />
 		<collision>
 	        <origin xyz="0.0 0.0 0.0" rpy="0 0 0" />
@@ -49,14 +69,14 @@
 	    	<origin xyz="0.0 0.0 0.0" rpy="0 0 0" /> 
 	        
 	        <geometry>
-	             <!--<mesh filename="./resources/../../../model/test_objects/meshes/visual/CompanionCube.obj" scale="1.0 1.0 1.0"/>-->
-	             <box size="18 0.0005 1.07" />
+	             <!<mesh filename="./resources/../../../model/test_objects/meshes/visual/CompanionCube.obj" scale="1.0 1.0 1.0"/>-->
+	             <!-- <box size="18 0.0005 1.07" />
 	        </geometry>
 	        <material name="material_grey">
 		        <color rgba="0.1 0.1 0.1 1.0" />
 	        </material>
 	    </visual>
-	</static_object>
+	</static_object> --> 
 
 	<!--<static_object name="Table">
 		<origin xyz="0.0 -0.8 0" rpy="0 0 0" />
