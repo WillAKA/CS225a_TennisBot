@@ -27,10 +27,10 @@ const string camera_name = "camera_fixed";
 
 // redis keys:
 // - write:
-const std::string JOINT_ANGLES_KEY = "sai2::cs225a::project::panda::sensors::q";
-const std::string JOINT_VELOCITIES_KEY = "sai2::cs225a::project::panda::sensors::dq";
+const std::string JOINT_ANGLES_KEY = "sai2::cs225a::project::sensors::q";
+const std::string JOINT_VELOCITIES_KEY = "sai2::cs225a::project::sensors::dq";
 // - read
-const std::string JOINT_TORQUES_COMMANDED_KEY = "sai2::cs225a::project::panda::actuators::fgc";
+const std::string JOINT_TORQUES_COMMANDED_KEY = "sai2::cs225a::project::actuators::fgc";
 
 RedisClient redis_client;
 
