@@ -113,6 +113,7 @@ int main() {
 
 	// Testing code
 	bool test = true;
+	Vector3d world_to_robot1 = Vector3d(0,2,0.3);
 
 	while (runloop) {
 		// wait for next scheduled loop
@@ -141,7 +142,7 @@ int main() {
 			if( (robot->_q - q_init_desired).norm() < 0.15 )
 			{
 				posori_task->reInitializeTask();
-				posori_task->_desired_position = Vector3d(0,0,1);
+				posori_task->_desired_position = Vector3d(0,0,1)-world_to_robot1;
 
 				//posori_task->_desired_velocity = Vector3d(1,1,1);
 				
@@ -174,10 +175,7 @@ int main() {
 
 			command_torques = posori_task_torques + joint_task_torques;
 			
-			if (posori_task->goalOrientationReached(0.15,false) && test) {
-				//posori_task->reInitializeTask();
-
-			}
+			
 			
 		}
 

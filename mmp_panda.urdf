@@ -189,12 +189,12 @@
     </inertial>
     <visual>
       <geometry>
-        <mesh filename="../../../CS225a_TennisBot/Objects/Visual/TennisRacquet.obj"/>
+        <mesh filename="../../../CS225a_TennisBot/Objects/Visual/CollisionMeshRacquetBasic.obj"/>
       </geometry>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="../../../CS225a_TennisBot/Objects/Visual/CollisionMeshRacquetBasic.obj"/>
+        <mesh filename="../../../CS225a_TennisBot/Objects/Visual/TennisRacquet.obj"/>
       </geometry>
     </collision> 
     </link>
