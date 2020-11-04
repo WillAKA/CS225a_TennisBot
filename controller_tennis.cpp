@@ -9,6 +9,7 @@
 
 #include <iostream>
 #include <string>
+#include <math.h>
 
 #include <signal.h>
 bool runloop = true;
@@ -22,6 +23,10 @@ const string robot_file = "./resources/mmp_panda.urdf";
 
 #define JOINT_CONTROLLER      0
 #define POSORI_CONTROLLER     1
+#define HITTING 			  2
+#define RETURNING 			  3
+#define G 9.81
+#define HITZ 0.5
 
 int state = JOINT_CONTROLLER;
 
@@ -30,6 +35,8 @@ int state = JOINT_CONTROLLER;
 std::string JOINT_ANGLES_KEY;
 std::string JOINT_VELOCITIES_KEY;
 std::string JOINT_TORQUES_SENSED_KEY;
+std::string OBJ_POSITION_KEY;
+std::string OBJ_VELOCITIES_KEY;
 // - write
 std::string JOINT_TORQUES_COMMANDED_KEY;
 
@@ -42,11 +49,98 @@ unsigned long long controller_counter = 0;
 
 const bool inertia_regularization = true;
 
+pair<double, double> hitting_spot(Vector3d ball_p, Vector3d ball_v, double hit_z, pair<double, double> r_p){
+	// given the ball position and velocity, and the height of hit position, 
+	// returning the x and y position where the ball will be at (where the robot needs to go to)
+
+	// Implementation: calculate 1-3 potential hit positions and select the one which requires smallest speed to get to
+	double restitution = 0.759;
+
+	vector<pair<double, double>> potential_hit_spots;
+	vector<double> required_speeds;
+
+	double delta = sqrt(pow(ball_v(2,0),2)+2*G*ball_p(2,0));
+	
+	// two time points when the ball hit the ground
+	double t1 = (ball_v(2)-delta)/G;
+	double t2 = (ball_v(2)+delta)/G;
+
+	double h_x, h_y;
+
+	// first see if it has already bounced once in its half court
+	if(ball_p(1)+t1*ball_v(1)>0){
+		// not yet bounced in its half court
+		delta = sqrt(pow(ball_v(2),2)+2*G*(ball_p(2)-hit_z)); // TO DO: what if delta is imaginary
+		// time point when the ball is at hit_z
+		double t = (ball_v(2)+delta)/G;
+		
+		if(t>0){
+			h_x = ball_v(0)*t+ball_p(0);
+			h_y = ball_v(1)*t+ball_p(1);
+			potential_hit_spots.push_back((pair<double, double>){h_x, h_y});
+			required_speeds.push_back((pow(r_p.first-h_x,2)+pow(r_p.second-h_y,2))/t);
+		}
+		// then add two more points after bouncing:
+		// using the point where it hits the ground:
+		Vector3d ball_p_after, ball_v_after;
+		ball_p_after << ball_p(0)+ball_v(0)*t2, ball_p(1)+ball_v(1)*t2, 0;
+		ball_v_after << restitution*ball_v(0), restitution*ball_v(1), restitution*(-ball_v(2)+G*t2);
+		double delta_after = sqrt(pow(ball_v_after(2),2)+2*G*(ball_p_after(2)-hit_z));
+		double t1_after = (ball_v_after(2)-delta_after)/G;
+		double t2_after = (ball_v_after(2)+delta_after)/G;
+
+		h_x = ball_v_after(0)*t1_after+ball_p_after(0);
+		h_y = ball_v_after(1)*t1_after+ball_p_after(1);
+		potential_hit_spots.push_back((pair<double, double>){h_x, h_y});
+		required_speeds.push_back((pow(r_p.first-h_x,2)+pow(r_p.second-h_y,2))/(t+t1_after));
+
+		h_x = ball_v_after(0)*t2_after+ball_p_after(0);
+		h_y = ball_v_after(1)*t2_after+ball_p_after(1);
+		potential_hit_spots.push_back((pair<double, double>){h_x, h_y});
+		required_speeds.push_back((pow(r_p.first-h_x,2)+pow(r_p.second-h_y,2))/(t+t2_after));
+	} else{
+		// already bounced once in its half court
+		delta = sqrt(pow(ball_v(2),2)+2*G*(ball_p(2)-hit_z));
+		t1 = (ball_v(2)-delta)/G;
+		t2 = (ball_v(2)+delta)/G;
+
+		if(t1 > 0){
+			h_x = ball_v(0)*t1+ball_p(0);
+			h_y = ball_v(1)*t1+ball_p(1);
+			potential_hit_spots.push_back((pair<double, double>){h_x, h_y});
+			required_speeds.push_back((pow(r_p.first-h_x,2)+pow(r_p.second-h_y,2))/t1);
+		}
+
+		if(t2 > 0){
+			h_x = ball_v(0)*t2+ball_p(0);
+			h_y = ball_v(1)*t2+ball_p(1);
+			potential_hit_spots.push_back((pair<double, double>){h_x, h_y});
+			required_speeds.push_back((pow(r_p.first-h_x,2)+pow(r_p.second-h_y,2))/t2);
+		}
+	}
+	int index=-1;
+	int speed_min = 100000;
+	for(int i=0; i<required_speeds.size();i++){
+		if(required_speeds[i]<speed_min){
+			index = i;
+			speed_min = required_speeds[i];
+		}
+	}
+	if(index == -1){
+		// no hitable point
+		return r_p;
+	} else{
+		return potential_hit_spots[index];
+	}
+}
+
 int main() {
 
 	JOINT_ANGLES_KEY = "sai2::cs225a::project::sensors::q";
 	JOINT_VELOCITIES_KEY = "sai2::cs225a::project::sensors::dq";
 	JOINT_TORQUES_COMMANDED_KEY = "sai2::cs225a::project::actuators::fgc";
+	OBJ_POSITION_KEY  = "cs225a::robot::ball::sensors::q";
+	OBJ_VELOCITIES_KEY = "cs225a::robot::ball::sensors::dq";
 
 	// start redis client
 	auto redis_client = RedisClient();
@@ -62,6 +156,13 @@ int main() {
 	robot->_q = redis_client.getEigenMatrixJSON(JOINT_ANGLES_KEY);
 	VectorXd initial_q = robot->_q;
 	robot->updateModel();
+
+	// position and velocity of the ball (without creating a robot object)
+	VectorXd ball_p(6);
+	VectorXd ball_v(6);
+	ball_p = redis_client.getEigenMatrixJSON(OBJ_POSITION_KEY);
+	ball_v = redis_client.getEigenMatrixJSON(OBJ_VELOCITIES_KEY);
+
 
 	// prepare controller
 	int dof = robot->dof();
@@ -111,8 +212,17 @@ int main() {
 	double start_time = timer.elapsedTime(); //secs
 	bool fTimerDidSleep = true;
 
+	int count = 0;
+	pair<double,double> hit_point;
 	while (runloop) {
 		// wait for next scheduled loop
+		count += 1;
+		if(count % 5 == 0) // collect the ball position and velocity every 5 ms
+		{
+			ball_p = redis_client.getEigenMatrixJSON(OBJ_POSITION_KEY);
+			ball_v = redis_client.getEigenMatrixJSON(OBJ_VELOCITIES_KEY);
+		}
+
 		timer.waitForNextLoop();
 		double time = timer.elapsedTime() - start_time;
 
@@ -123,9 +233,21 @@ int main() {
 		// update model
 		robot->updateModel();
 	
-		if(state == JOINT_CONTROLLER)
+		// based on ball condition determine the robot state
+		if(ball_v(1)<0 && ball_p(1)>-15) {
+			state = HITTING;
+		} else state = RETURNING;
+
+		if(state == HITTING)
 		{
-			//cout <<"hello\n\r";			
+			cout << "HITTING\n";
+			hit_point = hitting_spot(ball_p.head(3), ball_v.head(3), HITZ, {robot->_q(0),robot->_q(1)});
+			q_init_desired(0) = hit_point.first;
+			q_init_desired(1) = hit_point.second;
+			if(count % 500 == 0){
+				// cout << " q_init_desired: " << q_init_desired(0) << ", " << q_init_desired(1);
+			}
+			joint_task->_desired_position = q_init_desired;
 			// update task model and set hierarchy
 			N_prec.setIdentity();
 			joint_task->updateTaskModel(N_prec);
@@ -156,6 +278,7 @@ int main() {
 
 		else if(state == POSORI_CONTROLLER)
 		{
+			cout << "POSORI\n";
 			//cout << "Bye\n\r";			
 			// update task model and set hierarchy
 			N_prec.setIdentity();
@@ -168,9 +291,22 @@ int main() {
 			joint_task->computeTorques(joint_task_torques);
 
 			command_torques = posori_task_torques + joint_task_torques;
-			
-			
-			
+		} else if (state == RETURNING){
+			cout << "RETURNING\n";
+			q_init_desired(0) = 0;
+			q_init_desired(1) = 0;
+			if(count % 100 == 0){
+				cout << " q_init_desired: " << q_init_desired(0) << ", " << q_init_desired(1);
+			}
+			joint_task->_desired_position = q_init_desired;
+			// update task model and set hierarchy
+			N_prec.setIdentity();
+			joint_task->updateTaskModel(N_prec);
+
+			// compute torques
+			joint_task->computeTorques(joint_task_torques);
+
+			command_torques = joint_task_torques;
 		}
 
 		// send to redis
