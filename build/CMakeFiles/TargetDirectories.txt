@@ -1,4 +1,0 @@
-/home/maomao/Desktop/CS225ExpRobotics/apps/CS225a_TennisBot/build/CMakeFiles/rebuild_cache.dir
-/home/maomao/Desktop/CS225ExpRobotics/apps/CS225a_TennisBot/build/CMakeFiles/edit_cache.dir
-/home/maomao/Desktop/CS225ExpRobotics/apps/CS225a_TennisBot/build/CMakeFiles/simviz_tennis.dir
-/home/maomao/Desktop/CS225ExpRobotics/apps/CS225a_TennisBot/build/CMakeFiles/controller_tennis.dir
