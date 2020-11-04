@@ -63,6 +63,7 @@ bool fTransZp = false;
 bool fTransZn = false;
 bool fRotPanTilt = false;
 bool fRobotLinkSelect = false;
+bool fToss = false;
 
 int main() {
 	cout << "Loading URDF world model file: " << world_file << endl;
@@ -274,6 +275,21 @@ int main() {
 				// then drag the mouse over a link to start applying a force to it.
 			}
 		}
+		if(fToss) // retoss a ball
+		{
+			object->_q(0) = 0.0;
+			object->_q(1) = 0.0;
+			object->_q(2) = 0.0;
+			object->_dq(0) = -0.5+0.01*(rand()%100);
+			object->_dq(1) = -5.0;
+			object->_dq(2) = 2.0;
+			object->_dq(3) = 0.0; // x spin
+			object->_dq(4) = 0.0; // x spin
+			object->_dq(5) = 0.0; // x spin
+
+			sim->setJointPositions(obj_name, object->_q);
+			sim->setJointVelocities(obj_name, object->_dq);
+		}
 	}
 
 	// stop simulation
@@ -358,8 +374,8 @@ void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* object, Simul
 
 		count += 1;
 		if(count %200 ==0){
-			cout << endl << "object positions: " << object->_q(0) << " " << object->_q(1)<< " " << object->_q(2)<< " " << object->_q(3)<< " " << object->_q(4) << " " << object->_q(5) << endl;
-			cout << endl << "object velocities: " << object->_dq(0) << " " << object->_dq(1)<< " " << object->_dq(2)<< " " << object->_dq(3)<< " " << object->_dq(4) << " " << object->_dq(5) << endl;
+			// cout << endl << "object positions: " << object->_q(0) << " " << object->_q(1)<< " " << object->_q(2)<< " " << object->_q(3)<< " " << object->_q(4) << " " << object->_q(5) << endl;
+			// cout << endl << "object velocities: " << object->_dq(0) << " " << object->_dq(1)<< " " << object->_dq(2)<< " " << object->_dq(3)<< " " << object->_dq(4) << " " << object->_dq(5) << endl;
 		}
 
 		//update last time
@@ -425,6 +441,9 @@ void keySelect(GLFWwindow* window, int key, int scancode, int action, int mods)
 		case GLFW_KEY_Z:
 			fTransZn = set;
 			break;
+		case GLFW_KEY_T: // re-toss a ball
+			fToss = set;
+			break;	
 		default:
 			break;
 	}
