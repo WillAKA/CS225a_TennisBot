@@ -192,11 +192,11 @@
         <mesh filename="../../../CS225a_TennisBot/Objects/Visual/TennisRacquet.obj"/>
       </geometry>
     </visual>
-    <!-- <collision>
+    <collision>
       <geometry>
-        <mesh filename="../../../model/panda/meshes/collision/link2.obj"/>
+        <mesh filename="../../../CS225a_TennisBot/Objects/Visual/TennisRacquet.obj"/>
       </geometry>
-    </collision> -->
+    </collision>
     </link>
 
 
