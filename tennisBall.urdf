@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='utf-8'?>
-<robot name="cup">
+<robot name="ball">
 
     <link name="link0">
       <inertial>
@@ -63,6 +63,7 @@
           <!-- <mesh filename="../../../model/test_objects/meshes/collision/cup.obj"/> -->
           <sphere radius="0.5" />
         </geometry>
+        <!-- <contact_coefficients mu="0.8" kp="0.8" kd="0.8"/> -->
       </collision>
     </link>
     
@@ -70,49 +71,49 @@
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <parent link="link0"/>
       <child link="link1"/>
-      <axis xyz="0 0 1"/>
-      <limit effort="21.3" lower="-100" upper="100" velocity="21.3"/>
+      <axis xyz="1 0 0"/>
+      <limit effort="100" lower="-100" upper="100" velocity="21.3"/>
     </joint>
     <joint name="joint2" type="prismatic">
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <parent link="link1"/>
       <child link="link2"/>
       <axis xyz="0 1 0"/>
-      <limit effort="21.3" lower="-100" upper="100" velocity="21.3"/>
+      <limit effort="100" lower="-100" upper="100" velocity="21.3"/>
     </joint>
     <joint name="joint3" type="prismatic">
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <parent link="link2"/>
       <child link="link3"/>
-      <axis xyz="1 0 0"/>
-      <limit effort="21.3" lower="-100" upper="100" velocity="21.3"/>
+      <axis xyz="0 0 1"/>
+      <limit effort="100" lower="-100" upper="100" velocity="21.3"/>
     </joint>
     <joint name="joint4" type="revolute">
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <parent link="link3"/>
       <child link="link4"/>
         <axis xyz="1 0 0"/>
-      <limit effort="21.3" lower="0" upper="6.28" velocity="21.3"/>
+      <limit effort="100" lower="0"  velocity="21.3"/>
     </joint>
     <joint name="joint5" type="revolute">
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <parent link="link4"/>
       <child link="link5"/>
         <axis xyz="0 1 0"/>
-      <limit effort="21.3" lower="0" upper="6.28" velocity="21.3"/>
+      <limit effort="100" lower="0" velocity="21.3"/>
     </joint>
     <joint name="joint6" type="revolute">
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <parent link="link5"/>
       <child link="link6"/>
         <axis xyz="0 0 1"/>
-      <limit effort="21.3" lower="0" upper="6.28" velocity="21.3"/>
+      <limit effort="100" lower="0" velocity="21.3"/>
     </joint>
 <!--     <joint name="joint4" type="spherical">
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <parent link="link3"/>
       <child link="link4"/>
-      <limit effort="100" lower="-100" upper="100" velocity="100"/>
+      <limit effort="100 lower="-100" upper="100" velocity="100"/>
     </joint> -->
 </robot>
 
