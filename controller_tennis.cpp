@@ -77,7 +77,7 @@ pair<double, double> hitting_spot(Vector3d ball_p, Vector3d ball_v, double hit_z
 		if(t>0){
 			h_x = ball_v(0)*t+ball_p(0);
 			h_y = ball_v(1)*t+ball_p(1);
-			potential_hit_spots.push_back((pair<double, double>){h_x, h_y});
+			potential_hit_spots.push_back({h_x, h_y});
 			required_speeds.push_back((pow(r_p.first-h_x,2)+pow(r_p.second-h_y,2))/t);
 		}
 		// then add two more points after bouncing:
@@ -91,12 +91,12 @@ pair<double, double> hitting_spot(Vector3d ball_p, Vector3d ball_v, double hit_z
 
 		h_x = ball_v_after(0)*t1_after+ball_p_after(0);
 		h_y = ball_v_after(1)*t1_after+ball_p_after(1);
-		potential_hit_spots.push_back((pair<double, double>){h_x, h_y});
+		potential_hit_spots.push_back({h_x, h_y});
 		required_speeds.push_back((pow(r_p.first-h_x,2)+pow(r_p.second-h_y,2))/(t+t1_after));
 
 		h_x = ball_v_after(0)*t2_after+ball_p_after(0);
 		h_y = ball_v_after(1)*t2_after+ball_p_after(1);
-		potential_hit_spots.push_back((pair<double, double>){h_x, h_y});
+		potential_hit_spots.push_back({h_x, h_y});
 		required_speeds.push_back((pow(r_p.first-h_x,2)+pow(r_p.second-h_y,2))/(t+t2_after));
 	} else{
 		// already bounced once in its half court
@@ -107,14 +107,14 @@ pair<double, double> hitting_spot(Vector3d ball_p, Vector3d ball_v, double hit_z
 		if(t1 > 0){
 			h_x = ball_v(0)*t1+ball_p(0);
 			h_y = ball_v(1)*t1+ball_p(1);
-			potential_hit_spots.push_back((pair<double, double>){h_x, h_y});
+			potential_hit_spots.push_back({h_x, h_y});
 			required_speeds.push_back((pow(r_p.first-h_x,2)+pow(r_p.second-h_y,2))/t1);
 		}
 
 		if(t2 > 0){
 			h_x = ball_v(0)*t2+ball_p(0);
 			h_y = ball_v(1)*t2+ball_p(1);
-			potential_hit_spots.push_back((pair<double, double>){h_x, h_y});
+			potential_hit_spots.push_back({h_x, h_y});
 			required_speeds.push_back((pow(r_p.first-h_x,2)+pow(r_p.second-h_y,2))/t2);
 		}
 	}
@@ -135,7 +135,6 @@ pair<double, double> hitting_spot(Vector3d ball_p, Vector3d ball_v, double hit_z
 }
 
 int main() {
-
 	JOINT_ANGLES_KEY = "sai2::cs225a::project::sensors::q";
 	JOINT_VELOCITIES_KEY = "sai2::cs225a::project::sensors::dq";
 	JOINT_TORQUES_COMMANDED_KEY = "sai2::cs225a::project::actuators::fgc";
@@ -160,8 +159,8 @@ int main() {
 	// position and velocity of the ball (without creating a robot object)
 	VectorXd ball_p(6);
 	VectorXd ball_v(6);
-	ball_p = redis_client.getEigenMatrixJSON(OBJ_POSITION_KEY);
-	ball_v = redis_client.getEigenMatrixJSON(OBJ_VELOCITIES_KEY);
+	ball_p;
+	ball_v;
 
 
 	// prepare controller
@@ -217,9 +216,11 @@ int main() {
 	while (runloop) {
 		// wait for next scheduled loop
 		count += 1;
-		if(count % 5 == 0) // collect the ball position and velocity every 5 ms
+		if(count % 2 == 0) // collect the ball position and velocity every 5 ms
 		{
 			ball_p = redis_client.getEigenMatrixJSON(OBJ_POSITION_KEY);
+			ball_p(1) += 5.0;
+			ball_p(2) += 3.0;
 			ball_v = redis_client.getEigenMatrixJSON(OBJ_VELOCITIES_KEY);
 		}
 
@@ -234,18 +235,20 @@ int main() {
 		robot->updateModel();
 	
 		// based on ball condition determine the robot state
-		if(ball_v(1)<0 && ball_p(1)>-15) {
+		if(ball_v(1)<0 && ball_p(1)>-8) {
 			state = HITTING;
 		} else state = RETURNING;
 
 		if(state == HITTING)
 		{
-			cout << "HITTING\n";
-			hit_point = hitting_spot(ball_p.head(3), ball_v.head(3), HITZ, {robot->_q(0),robot->_q(1)});
-			q_init_desired(0) = hit_point.first;
-			q_init_desired(1) = hit_point.second;
-			if(count % 500 == 0){
-				// cout << " q_init_desired: " << q_init_desired(0) << ", " << q_init_desired(1);
+			// cout << "HITTING\n";
+			joint_task->_kp = 250.0;
+			hit_point = hitting_spot(ball_p.head(3), ball_v.head(3), HITZ, {robot->_q(0),robot->_q(1)-5.0});
+			q_init_desired(0) = hit_point.first-0.5;
+			q_init_desired(1) = hit_point.second+5.0;
+			if(count % 200 == 0){
+				cout << "ball_p.head(3) " << ball_p.head(3) << "\nball_v.head(3) " << ball_v.head(3) << "\nrobot->_q " << robot->_q(0) << " " << robot->_q(1)-5.0 << endl;
+				cout << " q_init_desired: " << q_init_desired(0) << ", " << q_init_desired(1)<<endl;
 			}
 			joint_task->_desired_position = q_init_desired;
 			// update task model and set hierarchy
@@ -268,7 +271,7 @@ int main() {
 				
 
 				joint_task->reInitializeTask();
-				joint_task->_kp = 10;
+				
 
 				
 
@@ -278,7 +281,8 @@ int main() {
 
 		else if(state == POSORI_CONTROLLER)
 		{
-			cout << "POSORI\n";
+			// cout << "POSORI\n";
+			joint_task->_kp = 10;
 			//cout << "Bye\n\r";			
 			// update task model and set hierarchy
 			N_prec.setIdentity();
@@ -292,12 +296,10 @@ int main() {
 
 			command_torques = posori_task_torques + joint_task_torques;
 		} else if (state == RETURNING){
-			cout << "RETURNING\n";
-			q_init_desired(0) = 0;
+			// cout << "RETURNING\n";
+			joint_task->_kp = 250.0;
+			q_init_desired(0) = -0.5;
 			q_init_desired(1) = 0;
-			if(count % 100 == 0){
-				cout << " q_init_desired: " << q_init_desired(0) << ", " << q_init_desired(1);
-			}
 			joint_task->_desired_position = q_init_desired;
 			// update task model and set hierarchy
 			N_prec.setIdentity();
