@@ -28,7 +28,7 @@ const string robot_file = "./resources/mmp_panda.urdf";
 #define HITTING 	      4
 #define RETURNING 	      5
 #define G 9.81
-#define HITZ 0.5
+#define HITZ 1.5
 
 int swing_state = SWING_ORIENT;
 int state = HITTING;
@@ -57,7 +57,7 @@ pair<double, double> hitting_spot(Vector3d ball_p, Vector3d ball_v, double hit_z
 	// returning the x and y position where the ball will be at (where the robot needs to go to)
 
 	// Implementation: calculate 1-3 potential hit positions and select the one which requires smallest speed to get to
-	double restitution = 0.759;
+	double restitution = 0.9;
 
 	vector<pair<double, double>> potential_hit_spots;
 	vector<double> required_speeds;
@@ -226,7 +226,7 @@ int main() {
 		{
 			ball_p = redis_client.getEigenMatrixJSON(OBJ_POSITION_KEY);
 			ball_p(1) += 5.0;
-			ball_p(2) += 3.0;
+			ball_p(2) += 1.0;
 			ball_v = redis_client.getEigenMatrixJSON(OBJ_VELOCITIES_KEY);
 		}
 
@@ -249,11 +249,11 @@ int main() {
 		{
 			// cout << "HITTING\n";
 			joint_task->_kp = 250.0;
-			hit_point = hitting_spot(ball_p.head(3), ball_v.head(3), HITZ, {robot->_q(0),robot->_q(1)-5.0});
-			q_init_desired(0) = hit_point.first-0.5;
-			q_init_desired(1) = hit_point.second+5.0;
+			hit_point = hitting_spot(ball_p.head(3), ball_v.head(3), HITZ, {robot->_q(0),robot->_q(1)-8.0});
+			q_init_desired(0) = hit_point.first-0.3;
+			q_init_desired(1) = hit_point.second+8.0;
 			if(count % 200 == 0){
-				cout << "ball_p.head(3) " << ball_p.head(3) << "\nball_v.head(3) " << ball_v.head(3) << "\nrobot->_q " << robot->_q(0) << " " << robot->_q(1)-5.0 << endl;
+				cout << "ball_p.head(3) " << ball_p.head(3) << "\nball_v.head(3) " << ball_v.head(3) << "\nrobot->_q " << robot->_q(0) << " " << robot->_q(1)-8.0 << endl;
 				cout << " q_init_desired: " << q_init_desired(0) << ", " << q_init_desired(1)<<endl;
 			}
 			joint_task->_desired_position = q_init_desired;
