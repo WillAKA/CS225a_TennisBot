@@ -50,8 +50,9 @@
 	    <collision>
 	        <origin xyz="0.0 0.0 -0.0001" rpy="0 0 0" />
 	        <geometry>
-	            <box size="10 10 0.0002" />
+	            <box size="30 30 0.0002" />
 	        </geometry>
+	        <contact_coefficients mu="0.8" kp="0.8" kd="0.8"/>
 	    </collision>
 
 	</static_object>
