@@ -27,11 +27,12 @@ const string robot_file = "./resources/mmp_panda.urdf";
 #define SWING_MOTION          3
 #define HITTING 	      4
 #define RETURNING 	      5
+#define INITIALIZING          6
 #define G 9.81
-#define HITZ 1.5
+#define HITZ 1.0
 
 int swing_state = SWING_ORIENT;
-int state = HITTING;
+int state = INITIALIZING;
 
 // redis keys:
 // - read:
@@ -220,6 +221,12 @@ int main() {
 	int count = 0;
 	pair<double,double> hit_point;
 	while (runloop) {
+		
+
+		timer.waitForNextLoop();
+		double time = timer.elapsedTime() - start_time;
+
+
 		// wait for next scheduled loop
 		count += 1;
 		if(count % 2 == 0) // collect the ball position and velocity every 5 ms
@@ -230,8 +237,6 @@ int main() {
 			ball_v = redis_client.getEigenMatrixJSON(OBJ_VELOCITIES_KEY);
 		}
 
-		timer.waitForNextLoop();
-		double time = timer.elapsedTime() - start_time;
 
 		// read robot state from redis
 		robot->_q = redis_client.getEigenMatrixJSON(JOINT_ANGLES_KEY);
@@ -241,17 +246,128 @@ int main() {
 		robot->updateModel();
 	
 		// based on ball condition determine the robot state
-		if(ball_v(1)<0 && ball_p(1)>-8) {
+		/*if(ball_v(1)<0 && ball_p(1)>-8) {
 			state = HITTING;
-		} else state = RETURNING;
+		} else state = RETURNING;*/
 
-		if(state == HITTING)
+
+		switch(state) {
+			case INITIALIZING: {
+				cout << "Initilizing\n\r";
+				N_prec.setIdentity();
+				joint_task->updateTaskModel(N_prec);
+
+				joint_task->_desired_position = q_init_desired;
+				posori_task->_desired_position = Vector3d(0.75,0.0,0.5);
+				posori_task->_desired_orientation = AngleAxisd(-M_PI/2, Vector3d::UnitY()).toRotationMatrix() * AngleAxisd(-M_PI/2, Vector3d::UnitX()).toRotationMatrix() * AngleAxisd(M_PI/8, Vector3d::UnitY()).toRotationMatrix();	
+				//posori_task->_desired_orientation = ;
+
+				N_prec.setIdentity();
+				posori_task->updateTaskModel(N_prec);
+				N_prec = posori_task->_N;
+				joint_task->updateTaskModel(N_prec);
+
+
+
+				joint_task->computeTorques(joint_task_torques);
+
+				posori_task->computeTorques(posori_task_torques);
+
+				command_torques = joint_task_torques + posori_task_torques;
+				
+				if( posori_task->goalOrientationReached(0.15,false) )
+				{
+					joint_task->reInitializeTask();
+					N_prec.setIdentity();
+					joint_task->updateTaskModel(N_prec);
+
+					joint_task->_kp = 250.0;
+					//q_init_desired(0) = -0.5;
+					//q_init_desired(1) = 0;
+					joint_task->_desired_position(0) = -0.5;
+					joint_task->_desired_position(1) = -5.0;
+
+					cout << joint_task->_desired_position << "\n\r";
+					
+
+					
+
+					state = RETURNING;
+				}
+			}
+			break;
+
+			case RETURNING: {
+				cout<<"RETURNING\n\r";
+				hit_point = hitting_spot(ball_p.head(3), ball_v.head(3), HITZ, {robot->_q(0),robot->_q(1)-8.0});
+				if(ball_v(1)<0 && ball_p(1)<3 && ball_p(1) > -12) {
+					
+					cout<<"BAll detection\n\r";
+					cout << hit_point.first << "\n\r";
+					cout << hit_point.second << "\n\r";
+					//joint_task->reInitializeTask();
+					q_init_desired(0) = hit_point.first;
+					q_init_desired(1) = hit_point.second;
+
+					
+
+					joint_task->_desired_position(0) = hit_point.first-0.3;
+					joint_task->_desired_position(1) = hit_point.second;
+
+
+					joint_task->computeTorques(joint_task_torques);
+
+
+					command_torques = joint_task_torques;
+
+					//state = HITTING;
+				} else {
+					// update task model and set hierarchy
+					//joint_task->_desired_position(0) = -0.5;
+					//joint_task->_desired_position(1) = 0.0;
+
+					// compute torques
+					//cout << joint_task->_desired_position << "\n\r";
+					joint_task->_desired_position(0) = -0.5;
+					joint_task->_desired_position(1) = -5.0;
+					joint_task->computeTorques(joint_task_torques);
+
+
+					command_torques = joint_task_torques;
+				}
+			}
+			break;
+
+			case HITTING: {
+				// update task model and set hierarchy
+				N_prec.setIdentity();
+				//posori_task->updateTaskModel(N_prec);
+				//N_prec = posori_task->_N;
+				joint_task->updateTaskModel(N_prec);
+
+				// compute torques
+				joint_task->computeTorques(joint_task_torques);
+				//posori_task->computeTorques(posori_task_torques);
+
+				command_torques = joint_task_torques;// + posori_task_torques;
+				
+			}
+			break;
+		
+		}
+
+
+
+
+
+
+		/*if(state == HITTING)
 		{
-			// cout << "HITTING\n";
+			 cout << "\n\r\n\rHITTING\n";
 			joint_task->_kp = 250.0;
 			hit_point = hitting_spot(ball_p.head(3), ball_v.head(3), HITZ, {robot->_q(0),robot->_q(1)-8.0});
 			q_init_desired(0) = hit_point.first-0.3;
-			q_init_desired(1) = hit_point.second+8.0;
+			q_init_desired(1) = hit_point.second;
 			if(count % 200 == 0){
 				cout << "ball_p.head(3) " << ball_p.head(3) << "\nball_v.head(3) " << ball_v.head(3) << "\nrobot->_q " << robot->_q(0) << " " << robot->_q(1)-8.0 << endl;
 				cout << " q_init_desired: " << q_init_desired(0) << ", " << q_init_desired(1)<<endl;
@@ -288,10 +404,10 @@ int main() {
 
 				
 
-				state = POSORI_CONTROLLER;
+				//state = POSORI_CONTROLLER;
 			}
-		}
-
+		}*/
+/*
 		else if(state == POSORI_CONTROLLER)
 		{
 			// cout << "POSORI\n";
@@ -329,7 +445,7 @@ int main() {
 			joint_task->computeTorques(joint_task_torques);
 			command_torques = joint_task_torques;
 		} else if (state == RETURNING){
-			// cout << "RETURNING\n";
+			 cout << "\n\r\n\rRETURNING\n";
 			joint_task->_kp = 250.0;
 			q_init_desired(0) = -0.5;
 			q_init_desired(1) = 0;
@@ -341,7 +457,7 @@ int main() {
 			// compute torques
 
 			command_torques = joint_task_torques;
-		}
+		}*/
 
 		// send to redis
 		//cout << "Command torques   :\n\r" << command_torques << "\n\r\n\r";
