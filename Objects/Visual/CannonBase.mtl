@@ -1,0 +1,12 @@
+# Blender MTL File: 'CannonBase.blend'
+# Material Count: 1
+
+newmtl Cannon_Wheels
+Ns 225.000000
+Ka 1.000000 1.000000 1.000000
+Kd 0.187821 0.045186 0.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+map_Kd 783c00.png
