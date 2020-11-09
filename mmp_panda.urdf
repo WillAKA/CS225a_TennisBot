@@ -183,18 +183,20 @@
 
   <link name="racquetlink">
     <inertial>
-      <origin xyz="0 -0 0" rpy="0 -0 0" />
+      <origin xyz="0 -0 0.0" rpy="0 -0 0" /><!--0.5842-->
       <mass value=".3203496" />
       <inertia ixx="0.3" iyy="0.3" izz="0.3" ixy="0" ixz="0" iyz="0" />
     </inertial>
     <visual>
       <geometry>
-        <mesh filename="../../../CS225a_TennisBot/Objects/Visual/TennisRacquet.obj"/>
+        <mesh filename="../../../CS225a_TennisBot/Objects/Visual/TennisRacquet.obj"/><!--CS225a_TennisBot/Objects/Visual/CollisionMeshRacquetBasic.obj"-->
+	<!--<box size="0.25 1.5 0.0002" />-->
       </geometry>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="../../../CS225a_TennisBot/Objects/Visual/CollisionMeshRacquetBasic.obj"/>
+        <!--<mesh filename="../../../CS225a_TennisBot/Objects/Visual/CollisionMeshRacquetBasic.obj"/>-->
+	<box size="0.25 1.5 0.0002" />
       </geometry>
     </collision> 
     </link>
@@ -302,7 +304,7 @@
 
 <joint name="joint8" type="fixed">
       <safety_controller k_position="100.0" k_velocity="40.0" soft_lower_limit="-2.8973" soft_upper_limit="2.8973"/>
-      <origin rpy="1.57079632679 0 0" xyz="0.088 0 0"/>
+      <origin rpy="1.57079632679 0 0" xyz="0.0 0 0"/>
       <parent link="link7"/>
       <child link="racquetlink"/>
       <axis xyz="0 0 1"/>

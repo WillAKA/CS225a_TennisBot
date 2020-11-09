@@ -22,7 +22,10 @@ const string robot_file = "./resources/mmp_panda.urdf";
 
 #define JOINT_CONTROLLER      0
 #define POSORI_CONTROLLER     1
+#define SWING_ORIENT          2
+#define SWING_MOTION          3
 
+int swing_state = SWING_ORIENT;
 int state = JOINT_CONTROLLER;
 
 // redis keys:
@@ -69,8 +72,8 @@ int main() {
 	MatrixXd N_prec = MatrixXd::Identity(dof, dof);
 
 	// pose task
-	const string control_link = "link7";
-	const Vector3d control_point = Vector3d(0.0,0.0,0.05);
+	const string control_link = "racquetlink";
+	const Vector3d control_point = Vector3d(0.0,0.45,0.0);
 	auto posori_task = new Sai2Primitives::PosOriTask(robot, control_link, control_point);
 
 #ifdef USING_OTG
@@ -113,6 +116,7 @@ int main() {
 
 	// Testing code
 	bool test = true;
+	Vector3d robot1_inWorld = Vector3d(0, 1.5, 0.5);
 
 	while (runloop) {
 		// wait for next scheduled loop
@@ -141,13 +145,18 @@ int main() {
 			if( (robot->_q - q_init_desired).norm() < 0.15 )
 			{
 				posori_task->reInitializeTask();
-				posori_task->_desired_position = Vector3d(0,0,1);
-
+				// Just adjust orientation at the end
+				// Acceleration of the base to hit the base
+				// Use joint 4
+				posori_task->_desired_position = Vector3d(0.75,0.0,0.5);
+				//Vector3d Position = Vector3d(0,0.75,1) - robot1_inWorld;
+				//posori_task->_otg->setGoalPositionAndLinearVelocity(Position, Vector3d(1.0,1.0,1.0));
+				
 				//posori_task->_desired_velocity = Vector3d(1,1,1);
 				
-				posori_task->_desired_orientation = AngleAxisd(-M_PI/2, Vector3d::UnitX()).toRotationMatrix() * posori_task->_desired_orientation;
+				posori_task->_desired_orientation = AngleAxisd(-M_PI/2, Vector3d::UnitY()).toRotationMatrix() * posori_task->_desired_orientation;
 				
-				//posori_task->_desired_orientation = AngleAxisd(-M_PI/6, Vector3d::UnitY()).toRotationMatrix() * posori_task->_desired_orientation;
+				posori_task->_desired_orientation = AngleAxisd(-M_PI/10, Vector3d::UnitX()).toRotationMatrix() * posori_task->_desired_orientation;
 				
 
 				joint_task->reInitializeTask();
@@ -176,9 +185,23 @@ int main() {
 			
 			if (posori_task->goalOrientationReached(0.15,false) && test) {
 				//posori_task->reInitializeTask();
+				joint_task->reInitializeTask();
+				joint_task->_kp = 40;
+				//q_init_desired << 0.0,0.0,90.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
+				//q_init_desired << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
+				q_init_desired *= M_PI/180.0;
+				joint_task->_desired_position[3] = -180*M_PI/180.0;
+				//joint_task->_desired_position[1] = -.5;
+				state = SWING_ORIENT;
 
 			}
 			
+		} 
+		else if(state == SWING_ORIENT) {
+			N_prec.setIdentity();
+			joint_task->updateTaskModel(N_prec);
+			joint_task->computeTorques(joint_task_torques);
+			command_torques = joint_task_torques;
 		}
 
 		// send to redis

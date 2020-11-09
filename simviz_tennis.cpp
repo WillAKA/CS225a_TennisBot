@@ -32,8 +32,8 @@ const string ee_link_name = "link7";
 // - write:
 const std::string JOINT_ANGLES_KEY = "sai2::cs225a::project::sensors::q";
 const std::string JOINT_VELOCITIES_KEY = "sai2::cs225a::project::sensors::dq";
-const std::string OBJ_JOINT_ANGLES_KEY  = "cs225a::object::ball::sensors::q";
-const std::string OBJ_JOINT_VELOCITIES_KEY = "cs225a::object::ball::sensors::dq";
+const std::string OBJ_POSITION_KEY  = "cs225a::robot::ball::sensors::q";
+const std::string OBJ_VELOCITIES_KEY = "cs225a::robot::ball::sensors::dq";
 // - read
 const std::string JOINT_TORQUES_COMMANDED_KEY = "sai2::cs225a::project::actuators::fgc";
 
@@ -63,6 +63,7 @@ bool fTransZp = false;
 bool fTransZn = false;
 bool fRotPanTilt = false;
 bool fRobotLinkSelect = false;
+bool fToss = false;
 
 int main() {
 	cout << "Loading URDF world model file: " << world_file << endl;
@@ -88,7 +89,17 @@ int main() {
 	// load robot objects
 	auto object = new Sai2Model::Sai2Model(obj_file, false);
 	// object->_q(0) = 0.60;
-	// object->_q(1) = -0.35;
+	//object->_q(1) = -0.35;
+	object->_q(0) = 0.0;
+	object->_q(1) = 0.0;
+	object->_q(2) = 0.0;
+	object->_dq(0) = .3;
+	object->_dq(1) = -4.0;
+	object->_dq(2) = 3.0;
+	object->_dq(3) = 0.0; // x spin
+	object->_dq(4) = 0.0; // x spin
+	object->_dq(5) = 0.0; // x spin
+	
 	object->updateModel();
 
 
@@ -96,11 +107,19 @@ int main() {
 	auto sim = new Simulation::Sai2Simulation(world_file, false);
 	sim->setCollisionRestitution(0.759);
 	sim->setCoeffFrictionStatic(0.6);
+	sim->setCoeffFrictionDynamic(0.6);
+
+	sim->setJointPositions(obj_name, object->_q);
+	sim->setJointVelocities(obj_name, object->_dq);
 
 	// read joint positions, velocities, update model
 	sim->getJointPositions(robot_name, robot->_q);
 	sim->getJointVelocities(robot_name, robot->_dq);
 	robot->updateKinematics();
+
+	redis_client.setEigenMatrixJSON(OBJ_POSITION_KEY, object->_q);
+	redis_client.setEigenMatrixJSON(OBJ_VELOCITIES_KEY, object->_dq);
+	object->updateKinematics();
 
 	/*------- Set up visualization -------*/
 	// set up error callback
@@ -251,6 +270,21 @@ int main() {
 				// then drag the mouse over a link to start applying a force to it.
 			}
 		}
+		if(fToss) // retoss a ball
+		{
+			object->_q(0) = 0.0;
+			object->_q(1) = 0.0;
+			object->_q(2) = 0.0;
+			object->_dq(0) = 0.0;//-0.5+0.01*(rand()%100);
+			object->_dq(1) = 10.0;
+			object->_dq(2) = 0.0;
+			object->_dq(3) = 0.0; // x spin
+			object->_dq(4) = 0.0; // x spin
+			object->_dq(5) = 0.0; // x spin
+
+			sim->setJointPositions(obj_name, object->_q);
+			sim->setJointVelocities(obj_name, object->_dq);
+		}
 	}
 
 	// stop simulation
@@ -291,6 +325,12 @@ void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* object, Simul
 	Eigen::VectorXd ui_force_command_torques;
 	ui_force_command_torques.setZero();
 
+	//Teste
+	//object->_dq(0) = 1;
+
+		//cout << endl << "object positions: " << object->_q(0) << " " << object->_q(1)<< " " << object->_q(2)<< " " << object->_q(3)<< " " << object->_q(4) << " " << object->_q(5) << endl;
+	//cout << endl << "object velocities: " << object->_dq(0) << " " << object->_dq(1)<< " " << object->_dq(2)<< " " << object->_dq(3)<< " " << object->_dq(4) << " " << object->_dq(5) << endl;	
+	int count = 0;
 	while (fSimulationRunning) {
 		fTimerDidSleep = timer.waitForNextLoop();
 
@@ -326,6 +366,16 @@ void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* object, Simul
 		// write new robot state to redis
 		redis_client.setEigenMatrixJSON(JOINT_ANGLES_KEY, robot->_q);
 		redis_client.setEigenMatrixJSON(JOINT_VELOCITIES_KEY, robot->_dq);
+
+		// write new object state to redis
+		redis_client.setEigenMatrixJSON(OBJ_POSITION_KEY, object->_q);
+		redis_client.setEigenMatrixJSON(OBJ_VELOCITIES_KEY, object->_dq);
+
+		count += 1;
+		if(count %200 ==0){
+			//cout << endl << "object positions: " << object->_q(0) << " " << object->_q(1)<< " " << object->_q(2)<< " " << object->_q(3)<< " " << object->_q(4) << " " << object->_q(5) << endl;
+			//cout << endl << "object velocities: " << object->_dq(0) << " " << object->_dq(1)<< " " << object->_dq(2)<< " " << object->_dq(3)<< " " << object->_dq(4) << " " << object->_dq(5) << endl;
+		}
 
 		//update last time
 		last_time = curr_time;
@@ -390,6 +440,9 @@ void keySelect(GLFWwindow* window, int key, int scancode, int action, int mods)
 		case GLFW_KEY_Z:
 			fTransZn = set;
 			break;
+		case GLFW_KEY_T: // re-toss a ball
+			fToss = set;
+		break;
 		default:
 			break;
 	}

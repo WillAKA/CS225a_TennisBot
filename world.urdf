@@ -11,7 +11,7 @@
 
 	<robot name="ball">
 		<model dir="./resources" path="tennisBall.urdf" name="ball" />
-		<origin xyz="-1 1.5 3" rpy="0 0 0" />
+		<origin xyz="0.75 0 1.0" rpy="0 0 0" />
 
 	</robot>
 
