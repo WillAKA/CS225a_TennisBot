@@ -25,13 +25,13 @@ const string robot_file = "./resources/mmp_panda.urdf";
 #define POSORI_CONTROLLER     1
 #define SWING_ORIENT          2
 #define SWING_MOTION          3
-#define HITTING 			  2
-#define RETURNING 			  3
+#define HITTING 	      4
+#define RETURNING 	      5
 #define G 9.81
 #define HITZ 0.5
 
 int swing_state = SWING_ORIENT;
-int state = JOINT_CONTROLLER;
+int state = HITTING;
 
 // redis keys:
 // - read:
@@ -339,7 +339,6 @@ int main() {
 			joint_task->updateTaskModel(N_prec);
 
 			// compute torques
-			joint_task->computeTorques(joint_task_torques);
 
 			command_torques = joint_task_torques;
 		}

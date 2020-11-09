@@ -280,8 +280,8 @@ int main() {
 			object->_q(0) = 0.0;
 			object->_q(1) = 0.0;
 			object->_q(2) = 0.0;
-			object->_dq(0) = -0.5+0.01*(rand()%100);
-			object->_dq(1) = -4.7+0.01*(rand()%60);
+			object->_dq(0) = 3.0;
+			object->_dq(1) = -8.0;
 			object->_dq(2) = 2.5;
 			object->_dq(3) = 0.0; // x spin
 			object->_dq(4) = 0.0; // x spin
