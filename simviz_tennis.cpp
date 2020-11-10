@@ -328,7 +328,7 @@ int main() {
 
 			double thx = -atan(zrange/yrange);
 			double thz = -atan(xrange/yrange);
-			cout << thz << " " << thx << endl;
+			// cout << thz << " " << thx << endl;
 
 
 			// Ball 
