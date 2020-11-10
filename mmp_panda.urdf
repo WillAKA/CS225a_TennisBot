@@ -208,7 +208,7 @@
     <parent link = "ground_link" />
     <child link= "base_x"/>
     <axis xyz = "1 0 0" />
-    <limit effort="100" velocity="1000.0" />
+    <limit effort="0" velocity="2.0" />
   </joint>
 
   <joint name = "base_prismatic_y" type = "prismatic">
@@ -216,7 +216,7 @@
     <parent link = "base_x" />
     <child link= "base_y"/>
     <axis xyz = "0 1 0" />
-    <limit effort="100" velocity="1000.0" />
+    <limit effort="0" velocity="2.0" />
   </joint>
 
   <joint name = "base_revolute" type = "revolute">
@@ -236,13 +236,13 @@
   </joint>
 -->
   <joint name="joint1" type="revolute">
-      <safety_controller k_position="100.0" k_velocity="40.0" soft_lower_limit="-2.8973" soft_upper_limit="2.8973"/>
+      <safety_controller k_position="100.0" k_velocity="100.0" soft_lower_limit="-2.8973" soft_upper_limit="2.8973"/>
       <origin rpy="0 0 1.5708" xyz="0 0 0.333"/>
       <parent link="base_link"/>
       <child link="link1"/>
       <axis xyz="0 0 1"/>
       <calibration falling="-80.0" />
-      <limit effort="87" lower="-2.8973" upper="2.8973" velocity="2.1750"/>
+      <limit effort="100" lower="-2.8973" upper="2.8973" velocity="100.0"/>
   </joint>
 
   <joint name="joint2" type="revolute">
