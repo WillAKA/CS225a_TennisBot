@@ -26,8 +26,8 @@ const string robot_file = "./resources/mmp_panda.urdf";
 #define RETURN_AND_POSE     2
           
 #define G 9.81
-#define HITZ 0.2
-#define BASE_HIT_OFF_X      0.3
+#define HITZ 0.3
+#define BASE_HIT_OFF_X      0.1
 #define BASE_HIT_OFF_Y      0.0
 
 
@@ -277,7 +277,7 @@ int main() {
 		{
 			ball_p = redis_client.getEigenMatrixJSON(OBJ_POSITION_KEY);
 			ball_p(1) += 5.0;
-			ball_p(2) += 1.0;
+			ball_p(2) += 2.0;
 			ball_v = redis_client.getEigenMatrixJSON(OBJ_VELOCITIES_KEY);
 		}
 
@@ -320,7 +320,7 @@ int main() {
 
 				command_torques = joint_task_torques + posori_task_torques;
 				
-				if( posori_task->goalOrientationReached(0.15,false) )
+				if( posori_task->goalOrientationReached(0.1,false) )
 				{
 					joint_task->reInitializeTask();
 					N_prec.setIdentity();
@@ -343,34 +343,16 @@ int main() {
 				cout<<"MOVE_AND_SWING\n\r";
 				hitting_spot(ball_p.head(3), ball_v.head(3), HITZ, {robot->_q(0),robot->_q(1)-5.0}, {0., 5.0}, 2.0, hit_param);
 				cout << "swing_speed: " << hit_param[2] << " theta1: " << hit_param[4] << " theta2: " << hit_param[5];
-				if(ball_v(1)<0 && ball_p(1)<5 && ball_p(1) > -12) {
-					
-					cout<<"BAll detection\n\r";
+				cout<<"BAll detection\n\r";
 
-					joint_task->_desired_position(0) = hit_param[0] - BASE_HIT_OFF_X;
-					joint_task->_desired_position(1) = hit_param[1] + 5.0 - BASE_HIT_OFF_Y;
+				joint_task->_desired_position(0) = hit_param[0] - BASE_HIT_OFF_X;
+				joint_task->_desired_position(1) = hit_param[1] + 5.0 - BASE_HIT_OFF_Y;
 
 
-					joint_task->computeTorques(joint_task_torques);
+				joint_task->computeTorques(joint_task_torques);
 
 
-					command_torques = joint_task_torques;
-
-					//state = HITTING;
-				} else {
-					// update task model and set hierarchy
-					//joint_task->_desired_position(0) = -0.5;
-					//joint_task->_desired_position(1) = 0.0;
-
-					// compute torques
-					//cout << joint_task->_desired_position << "\n\r";
-					joint_task->_desired_position(0) = -0.5;
-					joint_task->_desired_position(1) = 0.0;
-					joint_task->computeTorques(joint_task_torques);
-
-
-					command_torques = joint_task_torques;
-				}
+				command_torques = joint_task_torques;
 			}
 			break;
 
@@ -389,7 +371,6 @@ int main() {
 				//posori_task->computeTorques(posori_task_torques);
 
 				command_torques = joint_task_torques;// + posori_task_torques;
-				
 			}
 			break;
 		
