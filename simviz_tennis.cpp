@@ -25,6 +25,8 @@ const string robot_file = "./resources/mmp_panda.urdf";
 const string robot_name = "mmp_panda";
 const string obj_file = "./resources/tennisBall.urdf";
 const string obj_name = "ball"; 
+const string turret_file = "./resources/turret_shooter.urdf";
+const string turret_name = "turret_shooter";
 const string camera_name = "camera_fixed";
 const string ee_link_name = "link7";
 
@@ -34,13 +36,15 @@ const std::string JOINT_ANGLES_KEY = "sai2::cs225a::project::sensors::q";
 const std::string JOINT_VELOCITIES_KEY = "sai2::cs225a::project::sensors::dq";
 const std::string OBJ_POSITION_KEY  = "cs225a::robot::ball::sensors::q";
 const std::string OBJ_VELOCITIES_KEY = "cs225a::robot::ball::sensors::dq";
+const std::string SHOOTER_POSITION_KEY  = "cs225a::robot::turret_shooter::sensors::q";
+const std::string SHOOTER_VELOCITIES_KEY = "cs225a::robot::turret_shooter::sensors::dq";
 // - read
 const std::string JOINT_TORQUES_COMMANDED_KEY = "sai2::cs225a::project::actuators::fgc";
 
 RedisClient redis_client;
 
 // simulation function prototype
-void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* object, Simulation::Sai2Simulation* sim, UIForceWidget *ui_force_widget);
+void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* object, Sai2Model::Sai2Model* shooter, Simulation::Sai2Simulation* sim, UIForceWidget *ui_force_widget);
 
 // callback to print glfw errors
 void glfwError(int error, const char* description);
@@ -106,6 +110,18 @@ int main() {
 	object->_dq(4) = 0.0; // x spin
 	object->_dq(5) = 0.0; // x spin
 
+	auto shooter = new Sai2Model::Sai2Model(turret_file, false);
+	shooter->_q(0) = 0.0;
+	shooter->_q(1) = 0.0;
+	shooter->_q(2) = 0.0;
+	shooter->_dq(0) = 0.0;
+	shooter->_dq(1) = 0.0;
+	shooter->_dq(2) = 0.0;
+	shooter->_dq(3) = 0.0; 
+	shooter->_dq(4) = 0.0; 
+	shooter->_dq(5) = 0.0; 
+
+
 	// load simulation world
 	auto sim = new Simulation::Sai2Simulation(world_file, false);
 	sim->setCollisionRestitution(0.759);
@@ -115,6 +131,9 @@ int main() {
 	sim->setJointPositions(obj_name, object->_q);
 	sim->setJointVelocities(obj_name, object->_dq);
 
+	sim->setJointPositions(turret_name, shooter->_q);
+	sim->setJointVelocities(turret_name, shooter->_dq);
+
 	// read joint positions, velocities, update model
 	sim->getJointPositions(robot_name, robot->_q);
 	sim->getJointVelocities(robot_name, robot->_dq);
@@ -123,6 +142,10 @@ int main() {
 	redis_client.setEigenMatrixJSON(OBJ_POSITION_KEY, object->_q);
 	redis_client.setEigenMatrixJSON(OBJ_VELOCITIES_KEY, object->_dq);
 	object->updateKinematics();
+
+	redis_client.setEigenMatrixJSON(SHOOTER_POSITION_KEY, shooter->_q);
+	redis_client.setEigenMatrixJSON(SHOOTER_VELOCITIES_KEY, shooter->_dq);
+	shooter->updateKinematics();
 
 	
 
@@ -168,7 +191,7 @@ int main() {
 	glewInitialize();
 
 	fSimulationRunning = true;
-	thread sim_thread(simulation, robot, object, sim, ui_force_widget);
+	thread sim_thread(simulation, robot, object, shooter, sim, ui_force_widget);
 	
 	// while window is open:
 	while (!glfwWindowShouldClose(window) && fSimulationRunning)
@@ -178,6 +201,7 @@ int main() {
 		glfwGetFramebufferSize(window, &width, &height);
 		graphics->updateGraphics(robot_name, robot);
 		graphics->updateGraphics(obj_name, object);
+		graphics->updateGraphics(turret_name, shooter);
 		graphics->render(camera_name, width, height);
 
 		// swap buffers
@@ -277,18 +301,69 @@ int main() {
 		}
 		if(fToss) // retoss a ball
 		{
+			// For 3m above net and land in middle intersection of court
+			// double vy = -8.30;
+			// double vz = 8.23;
+			// For 2m above net and land in middle intersection of court
+			// double vy = -9.666;
+			// double vz = 6.945;	
+			// For 1m above net and land in middle intersection of court
+			// double vy = -11.033;
+			// double vz = 4.7315;	
+			// For 2m above net and land towards the back of the court
+			// double vy = -12.8156;
+			// double vz = 5.930;	
+
+			// Values taken sort of from some calculations done in comments above and then hand tuned
+			double xbound = 2;
+			double ylower = 9.0;
+			double yupper = 13.0;
+			double zlower = 5.77;
+			double zupper = 7.1;
+
+			double xrange = 2*xbound*rand()/RAND_MAX - xbound;
+			double yrange = (-(yupper - ylower)*rand()/RAND_MAX) - ylower;
+			double zrange =  ((zupper - zlower)*rand()/RAND_MAX) + zlower;
+			// cout << xrange << " " << yrange << " " << zrange << endl;
+
+			double thx = -atan(zrange/yrange);
+			double thz = -atan(xrange/yrange);
+			cout << thz << " " << thx << endl;
+
+
+			// Ball 
 			object->_q(0) = 0.0;
 			object->_q(1) = 0.0;
-			object->_q(2) = 0.0;
-			object->_dq(0) = 1.0;
-			object->_dq(1) = -8.0;
-			object->_dq(2) = 2.5;
+			object->_q(2) = -0.1; // z height position
+			// object->_dq(0) = 0.0;  // x velocity       //rand() % 3;
+			// object->_dq(1) = vy;  // y velocity
+			// object->_dq(2) = vz;  // z velocity
+			object->_dq(0) = xrange;  // x velocity
+			object->_dq(1) = yrange;  // y velocity
+			object->_dq(2) = zrange;  // z velocity
 			object->_dq(3) = 0.0; // x spin
 			object->_dq(4) = 0.0; // x spin
 			object->_dq(5) = 0.0; // x spin
 
 			sim->setJointPositions(obj_name, object->_q);
 			sim->setJointVelocities(obj_name, object->_dq);
+
+			// Shooter
+			shooter->_q(0) = 0.0;
+			shooter->_q(1) = 0.5;
+			shooter->_q(2) = 0.0;
+			shooter->_q(3) = thx; // rotation x
+			shooter->_q(4) = 0.0;
+			shooter->_q(5) = thz; // rotation z
+			shooter->_dq(0) = 0.0;
+			shooter->_dq(1) = 0.0;
+			shooter->_dq(2) = 0.0;
+			shooter->_dq(3) = 0.0; 
+			shooter->_dq(4) = 0.0; 
+			shooter->_dq(5) = 0.0; 
+
+			sim->setJointPositions(turret_name, shooter->_q);
+			sim->setJointVelocities(turret_name, shooter->_dq);
 		}
 	}
 
@@ -307,7 +382,7 @@ int main() {
 }
 
 //------------------------------------------------------------------------------
-void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* object, Simulation::Sai2Simulation* sim, UIForceWidget *ui_force_widget)
+void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* object, Sai2Model::Sai2Model* shooter, Simulation::Sai2Simulation* sim, UIForceWidget *ui_force_widget)
 {
 
 	int dof = robot->dof();
@@ -362,6 +437,10 @@ void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* object, Simul
 		sim->getJointVelocities(obj_name, object->_dq);
 		object->updateModel();
 
+		// sim->getJointPositions(turret_name, shooter->_q);
+		// sim->getJointVelocities(turret_name, shooter->_dq);
+		shooter->updateModel();
+
 		// write new robot state to redis
 		redis_client.setEigenMatrixJSON(JOINT_ANGLES_KEY, robot->_q);
 		redis_client.setEigenMatrixJSON(JOINT_VELOCITIES_KEY, robot->_dq);
@@ -369,6 +448,10 @@ void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* object, Simul
 		// write new object state to redis
 		redis_client.setEigenMatrixJSON(OBJ_POSITION_KEY, object->_q);
 		redis_client.setEigenMatrixJSON(OBJ_VELOCITIES_KEY, object->_dq);
+
+		// // write new shooter object state to redis
+		// redis_client.setEigenMatrixJSON(SHOOTER_POSITION_KEY, shooter->_q);
+		// redis_client.setEigenMatrixJSON(SHOOTER_VELOCITIES_KEY, shooter->_dq);
 
 		count += 1;
 		if(count %200 ==0){
