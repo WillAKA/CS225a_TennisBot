@@ -21,17 +21,16 @@ using namespace Eigen;
 
 const string robot_file = "./resources/mmp_panda.urdf";
 
-#define JOINT_CONTROLLER      0
-#define POSORI_CONTROLLER     1
-#define SWING_ORIENT          2
-#define SWING_MOTION          3
-#define HITTING 	      4
-#define RETURNING 	      5
-#define INITIALIZING          6
+#define INITIALIZING        0
+#define MOVE_AND_SWING      1
+#define RETURN_AND_POSE     2
+          
 #define G 9.81
-#define HITZ 1.0
+#define HITZ 0.2
+#define BASE_HIT_OFF_X      0.3
+#define BASE_HIT_OFF_Y      0.0
 
-int swing_state = SWING_ORIENT;
+
 int state = INITIALIZING;
 
 // redis keys:
@@ -53,14 +52,14 @@ unsigned long long controller_counter = 0;
 
 const bool inertia_regularization = true;
 
-pair<double, double> hitting_spot(Vector3d ball_p, Vector3d ball_v, double hit_z, pair<double, double> r_p){
+void hitting_spot(Vector3d ball_p, Vector3d ball_v, double hit_z, pair<double, double> r_p, pair<double, double> land, double z_at_net, double* hit_param){
 	// given the ball position and velocity, and the height of hit position, 
 	// returning the x and y position where the ball will be at (where the robot needs to go to)
 
 	// Implementation: calculate 1-3 potential hit positions and select the one which requires smallest speed to get to
 	double restitution = 0.9;
 
-	vector<pair<double, double>> potential_hit_spots;
+	vector<pair<pair<double, double>,double>> potential_hit_spots;
 	vector<double> required_speeds;
 
 	double delta = sqrt(pow(ball_v(2,0),2)+2*G*ball_p(2,0));
@@ -81,7 +80,7 @@ pair<double, double> hitting_spot(Vector3d ball_p, Vector3d ball_v, double hit_z
 		if(t>0){
 			h_x = ball_v(0)*t+ball_p(0);
 			h_y = ball_v(1)*t+ball_p(1);
-			potential_hit_spots.push_back({h_x, h_y});
+			potential_hit_spots.push_back({{h_x, h_y},t});
 			required_speeds.push_back((pow(r_p.first-h_x,2)+pow(r_p.second-h_y,2))/t);
 		}
 		// then add two more points after bouncing:
@@ -95,12 +94,12 @@ pair<double, double> hitting_spot(Vector3d ball_p, Vector3d ball_v, double hit_z
 
 		h_x = ball_v_after(0)*t1_after+ball_p_after(0);
 		h_y = ball_v_after(1)*t1_after+ball_p_after(1);
-		potential_hit_spots.push_back({h_x, h_y});
+		potential_hit_spots.push_back({{h_x, h_y},t+t1_after});
 		required_speeds.push_back((pow(r_p.first-h_x,2)+pow(r_p.second-h_y,2))/(t+t1_after));
 
 		h_x = ball_v_after(0)*t2_after+ball_p_after(0);
 		h_y = ball_v_after(1)*t2_after+ball_p_after(1);
-		potential_hit_spots.push_back({h_x, h_y});
+		potential_hit_spots.push_back({{h_x, h_y}, t+t2_after});
 		required_speeds.push_back((pow(r_p.first-h_x,2)+pow(r_p.second-h_y,2))/(t+t2_after));
 	} else{
 		// already bounced once in its half court
@@ -111,14 +110,14 @@ pair<double, double> hitting_spot(Vector3d ball_p, Vector3d ball_v, double hit_z
 		if(t1 > 0){
 			h_x = ball_v(0)*t1+ball_p(0);
 			h_y = ball_v(1)*t1+ball_p(1);
-			potential_hit_spots.push_back({h_x, h_y});
+			potential_hit_spots.push_back({{h_x, h_y}, t1});
 			required_speeds.push_back((pow(r_p.first-h_x,2)+pow(r_p.second-h_y,2))/t1);
 		}
 
 		if(t2 > 0){
 			h_x = ball_v(0)*t2+ball_p(0);
 			h_y = ball_v(1)*t2+ball_p(1);
-			potential_hit_spots.push_back({h_x, h_y});
+			potential_hit_spots.push_back({{h_x, h_y}, t2});
 			required_speeds.push_back((pow(r_p.first-h_x,2)+pow(r_p.second-h_y,2))/t2);
 		}
 	}
@@ -132,10 +131,54 @@ pair<double, double> hitting_spot(Vector3d ball_p, Vector3d ball_v, double hit_z
 	}
 	if(index == -1){
 		// no hitable point
-		return r_p;
+		hit_param[0] = r_p.first+BASE_HIT_OFF_X;
+		hit_param[1] = r_p.second+BASE_HIT_OFF_Y;
+		hit_param[2] = -1;
+		hit_param[3] = -1;
+		hit_param[4] = -1;
+		hit_param[5] = -1;
+		return;
 	} else{
-		return potential_hit_spots[index];
+		hit_param[0] = potential_hit_spots[index].first.first;
+		hit_param[1] = potential_hit_spots[index].first.second;
+	    hit_param[5] = potential_hit_spots[index].second;
 	}
+
+	// Now calculate parameters related to swing speed and orientation.
+	// t_hit_land: the time it takes from hit to land
+	double y0 = potential_hit_spots[index].first.second;
+	double yd = land.second;
+	double t_hit_land = sqrt(2*(yd-y0)*(yd*hit_z-(yd-y0)*z_at_net)/(G*y0*yd));
+	double vox = (land.first - potential_hit_spots[index].first.first)/t_hit_land; // v out x
+	double voy = (land.second- potential_hit_spots[index].first.second)/t_hit_land;// v out y
+	double voz = 0.5*G*t_hit_land-hit_z/t_hit_land;										   // v out z
+
+	// neglecting spin for now, assume after hitting, the normal relative speed is scaled by alpha1 
+	// and the parallel relative speed is scaled by alpha2 
+	double alpha1 = 0.7;
+	double alpha2 = 0.9;
+
+	double approx_alpha_square = 0.75*0.75; // first parameter to tune, value should be 0.7^2 to 0.8^2 : in the racket frame, assume |v_out| = approx_alpha * |v_in|
+	double a = 1 - approx_alpha_square;
+	double b = 2*approx_alpha_square*ball_v(1)-2*voy;
+	double c = vox*vox+voy*voy+voz*voz-approx_alpha_square*(ball_v(0)*ball_v(0)+ball_v(1)*ball_v(1)+ball_v(2)*ball_v(2));
+	double sqrt_delta = sqrt(b*b-4*a*c);
+	double swing_speed = (-b - sqrt_delta)/(2*a);
+	if(swing_speed < 0){
+		swing_speed = (-b + sqrt_delta)/(2*a);
+	}
+	hit_param[2] = swing_speed;
+
+	double ratio = 0.5; // second parameter to tune, hard to explain, value should be near 0.5 (0.4-0.6 maybe)
+
+	// normal vector
+	double nx = vox*(1-ratio)-ratio*ball_v(0);
+	double ny = (voy-swing_speed)*(1-ratio)-ratio*(ball_v(1)-swing_speed);
+	double nz = voz*(1-ratio)-ratio*ball_v(2);
+
+	hit_param[3] = atan(nx/ny);
+	hit_param[4] = atan(nz/sqrt(nx*nx+ny*ny));	
+	return;
 }
 
 int main() {
@@ -219,7 +262,8 @@ int main() {
 	bool test = true;
 	Vector3d robot1_inWorld = Vector3d(0, 1.5, 0.5);
 	int count = 0;
-	pair<double,double> hit_point;
+	// pair<double,double> hit_point;
+	double hit_param[6]; // x,y,speed, theta1, theta2, time
 	while (runloop) {
 		
 
@@ -246,9 +290,11 @@ int main() {
 		robot->updateModel();
 	
 		// based on ball condition determine the robot state
-		/*if(ball_v(1)<0 && ball_p(1)>-8) {
-			state = HITTING;
-		} else state = RETURNING;*/
+		if (state != INITIALIZING){
+			if(ball_v(1)<0 && ball_p(1)<3 && ball_p(1) > -10){
+				state = MOVE_AND_SWING;
+			} else state = RETURN_AND_POSE;
+		}
 
 
 		switch(state) {
@@ -260,7 +306,6 @@ int main() {
 				joint_task->_desired_position = q_init_desired;
 				posori_task->_desired_position = Vector3d(0.75,0.0,0.5);
 				posori_task->_desired_orientation = AngleAxisd(-M_PI/2, Vector3d::UnitY()).toRotationMatrix() * AngleAxisd(-M_PI/2, Vector3d::UnitX()).toRotationMatrix() * AngleAxisd(M_PI/8, Vector3d::UnitY()).toRotationMatrix();	
-				//posori_task->_desired_orientation = ;
 
 				N_prec.setIdentity();
 				posori_task->updateTaskModel(N_prec);
@@ -285,34 +330,25 @@ int main() {
 					//q_init_desired(0) = -0.5;
 					//q_init_desired(1) = 0;
 					joint_task->_desired_position(0) = -0.5;
-					joint_task->_desired_position(1) = -5.0;
+					joint_task->_desired_position(1) = 0.0;
 
 					cout << joint_task->_desired_position << "\n\r";
 					
-
-					
-
-					state = RETURNING;
+					state = RETURN_AND_POSE;
 				}
 			}
 			break;
 
-			case RETURNING: {
-				cout<<"RETURNING\n\r";
-				hit_point = hitting_spot(ball_p.head(3), ball_v.head(3), HITZ, {robot->_q(0),robot->_q(1)-8.0});
-				if(ball_v(1)<0 && ball_p(1)<3 && ball_p(1) > -12) {
+			case MOVE_AND_SWING: {
+				cout<<"MOVE_AND_SWING\n\r";
+				hitting_spot(ball_p.head(3), ball_v.head(3), HITZ, {robot->_q(0),robot->_q(1)-5.0}, {0., 5.0}, 2.0, hit_param);
+				cout << "swing_speed: " << hit_param[2] << " theta1: " << hit_param[4] << " theta2: " << hit_param[5];
+				if(ball_v(1)<0 && ball_p(1)<5 && ball_p(1) > -12) {
 					
 					cout<<"BAll detection\n\r";
-					cout << hit_point.first << "\n\r";
-					cout << hit_point.second << "\n\r";
-					//joint_task->reInitializeTask();
-					q_init_desired(0) = hit_point.first;
-					q_init_desired(1) = hit_point.second;
 
-					
-
-					joint_task->_desired_position(0) = hit_point.first-0.3;
-					joint_task->_desired_position(1) = hit_point.second;
+					joint_task->_desired_position(0) = hit_param[0] - BASE_HIT_OFF_X;
+					joint_task->_desired_position(1) = hit_param[1] + 5.0 - BASE_HIT_OFF_Y;
 
 
 					joint_task->computeTorques(joint_task_torques);
@@ -329,7 +365,7 @@ int main() {
 					// compute torques
 					//cout << joint_task->_desired_position << "\n\r";
 					joint_task->_desired_position(0) = -0.5;
-					joint_task->_desired_position(1) = -5.0;
+					joint_task->_desired_position(1) = 0.0;
 					joint_task->computeTorques(joint_task_torques);
 
 
@@ -338,11 +374,14 @@ int main() {
 			}
 			break;
 
-			case HITTING: {
+			case RETURN_AND_POSE: {
+				cout<<"RETURN_AND_POSE\n\r";
 				// update task model and set hierarchy
 				N_prec.setIdentity();
 				//posori_task->updateTaskModel(N_prec);
 				//N_prec = posori_task->_N;
+				joint_task->_desired_position(0) = -0.5;
+				joint_task->_desired_position(1) = 0.0;
 				joint_task->updateTaskModel(N_prec);
 
 				// compute torques
