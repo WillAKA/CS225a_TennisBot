@@ -12,7 +12,7 @@
 
 #include <iostream>
 #include <string>
-
+#include <fstream>
 #include <signal.h>
 bool fSimulationRunning = false;
 void sighandler(int){fSimulationRunning = false;}
@@ -405,6 +405,10 @@ void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* object, Sai2M
 	Eigen::VectorXd ui_force_command_torques;
 	ui_force_command_torques.setZero();
 
+	// Opens a text file to record data
+	ofstream myfile;
+	myfile.open ("simvizData.txt");
+
 	int count = 0;
 	while (fSimulationRunning) {
 		fTimerDidSleep = timer.waitForNextLoop();
@@ -454,14 +458,19 @@ void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* object, Sai2M
 		// redis_client.setEigenMatrixJSON(SHOOTER_VELOCITIES_KEY, shooter->_dq);
 
 		count += 1;
-		if(count %200 ==0){
+		if(count %10 == 0){
 			// cout << endl << "object positions: " << object->_q(0) << " " << object->_q(1)<< " " << object->_q(2)<< " " << object->_q(3)<< " " << object->_q(4) << " " << object->_q(5) << endl;
 			// cout << endl << "object velocities: " << object->_dq(0) << " " << object->_dq(1)<< " " << object->_dq(2)<< " " << object->_dq(3)<< " " << object->_dq(4) << " " << object->_dq(5) << endl;
+			
+			// Output Variables to the text file
+			myfile << object->_q(0) << ", " << object->_q(1)<< ", " << object->_q(2) << endl;
 		}
 
 		//update last time
 		last_time = curr_time;
 	}
+	//close the text file
+	myfile.close();
 
 	double end_time = timer.elapsedTime();
 	std::cout << "\n";
