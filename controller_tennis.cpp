@@ -27,8 +27,10 @@ const string robot_file = "./resources/mmp_panda.urdf";
           
 #define G 9.81
 #define HITZ 1.1
-#define BASE_HIT_OFF_X      0.8
+#define BASE_HIT_OFF_X      0.75
 #define BASE_HIT_OFF_Y      0.0
+
+#define BACK_SWING_ANGLE    75.*M_PI/180.
 
 double swing_arm_length = BASE_HIT_OFF_X;
 
@@ -230,9 +232,9 @@ int main() {
 #endif
 	
 	VectorXd posori_task_torques = VectorXd::Zero(dof);
-	posori_task->_kp_pos = 200.0;
+	posori_task->_kp_pos = 70.0;
 	posori_task->_kv_pos = 20.0;
-	posori_task->_kp_ori = 200.0;
+	posori_task->_kp_ori = 70.0;
 	posori_task->_kv_ori = 20.0;
 
 	// joint task
@@ -311,7 +313,7 @@ int main() {
 
 				joint_task->_desired_position = q_init_desired;
 				posori_task->_desired_position = Vector3d(0.75,0.0,0.5);
-				posori_task->_desired_orientation = AngleAxisd(-M_PI/2, Vector3d::UnitY()).toRotationMatrix() * AngleAxisd(-M_PI/2, Vector3d::UnitX()).toRotationMatrix() * AngleAxisd(M_PI/8, Vector3d::UnitY()).toRotationMatrix();	
+				posori_task->_desired_orientation = AngleAxisd(-M_PI/2, Vector3d::UnitY()).toRotationMatrix() * AngleAxisd(-M_PI/2, Vector3d::UnitX()).toRotationMatrix() * AngleAxisd(0, Vector3d::UnitY()).toRotationMatrix();	
 
 				N_prec.setIdentity();
 				posori_task->updateTaskModel(N_prec);
@@ -341,36 +343,88 @@ int main() {
 					cout << joint_task->_desired_position << "\n\r";
 					
 					state = RETURN_AND_POSE;
+					posori_task->reInitializeTask();
 				}
 			}
 			break;
 
 			case MOVE_AND_SWING: {
 				cout<<"MOVE_AND_SWING\n\r";
-				hitting_spot(ball_p.head(3), ball_v.head(3), HITZ, {robot->_q(0),robot->_q(1)-5.0}, {0., 5.0}, 2.0, hit_param);
+				hitting_spot(ball_p.head(3), ball_v.head(3), HITZ, {robot->_q(0),robot->_q(1)-5.0}, {-4.0, 5.0}, 3.0, hit_param);
 				// cout << "x: " << hit_param[0] << "y: " << hit_param[1] << " swing_speed: " << hit_param[2] << " theta1: " << hit_param[3] << " theta2: " << hit_param[4] << " time: " << hit_param[5];
 
 				joint_task->_desired_position(0) = hit_param[0] - BASE_HIT_OFF_X;
 				joint_task->_desired_position(1) = hit_param[1] + 5.0 - BASE_HIT_OFF_Y;
+				
+				if(abs(hit_param[3]+1)>1e-4){ // theta != -1
+					cout <<" theta1: " << hit_param[3] << " theta2: " << hit_param[4] <<endl;
+					posori_task->_desired_position = Vector3d(0.75*cos(BACK_SWING_ANGLE),-0.75*sin(BACK_SWING_ANGLE),0.5);
+					posori_task->_desired_orientation = AngleAxisd(-M_PI/2, Vector3d::UnitY()).toRotationMatrix() * AngleAxisd(-M_PI/2-BACK_SWING_ANGLE - hit_param[3], Vector3d::UnitX()).toRotationMatrix() * AngleAxisd(hit_param[4], Vector3d::UnitY()).toRotationMatrix();	
+				} else {
+					posori_task->reInitializeTask();
+				}
 
 				if(hit_param[5] > 0 && hit_param[5] < 0.2){
+					// joint_task->reInitializeTask();
+					// timing reauires that we must swing, so joint task takes priority
 					joint_task->_use_interpolation_flag = false;
 					// cout << "swing speed!" << hit_param[2]<< " ";
 					joint_task->_desired_position(3) = 1;
+					// joint_task->_desired_position(3) = 1;
 					// joint_task->_desired_velocity(3) = hit_param[2]/swing_arm_length;
+					N_prec.setIdentity();
+					joint_task->updateTaskModel(N_prec);
+					
+					joint_task->computeTorques(joint_task_torques);
+
+					command_torques = joint_task_torques;
+				} else{
+					// Not yet starting swing, so posori task takes priority
+						posori_task->_use_interpolation_flag = false;
+						cout << "not reached"<<endl;
+						N_prec.setIdentity();
+						posori_task->updateTaskModel(N_prec);
+						joint_task->updateTaskModel(N_prec);
+
+						joint_task->computeTorques(joint_task_torques);
+
+						posori_task->computeTorques(posori_task_torques);
+
+						command_torques = joint_task_torques + posori_task_torques;
+					
 				}
 
-				joint_task->updateTaskModel(N_prec);
+				// if(abs(hit_param[3]+1)>1e-4){ // theta != -1
+				// 	cout << "now we have angles for posori task!"<<endl;
+				// 	posori_task->_desired_position = Vector3d(0.75*cos(BACK_SWING_ANGLE),-0.75*sin(BACK_SWING_ANGLE),0.5);
+				// 	posori_task->_desired_orientation = AngleAxisd(-M_PI/2, Vector3d::UnitY()).toRotationMatrix() * AngleAxisd(-M_PI/2-BACK_SWING_ANGLE - hit_param[3], Vector3d::UnitX()).toRotationMatrix() * AngleAxisd(hit_param[4], Vector3d::UnitY()).toRotationMatrix();	
+				// 	N_prec.setIdentity();
+				// 	posori_task->updateTaskModel(N_prec);
+				// 	N_prec = posori_task->_N;
+				// 	joint_task->updateTaskModel(N_prec);
 
-				joint_task->computeTorques(joint_task_torques);
+				// 	joint_task->computeTorques(joint_task_torques);
 
-				// cout << "joint_task_torques.size()" << joint_task_torques.size() << endl;
-				// cout << joint_task_torques(0) << " " << joint_task_torques(1) << " " << joint_task_torques(2) << " " << joint_task_torques(3) <<endl;
-				command_torques = joint_task_torques;
+				// 	posori_task->computeTorques(posori_task_torques);
+
+				// 	command_torques = joint_task_torques + posori_task_torques;
+				// }
+				// else{
+				// 	N_prec.setIdentity();
+				// 	joint_task->updateTaskModel(N_prec);
+
+				// 	joint_task->computeTorques(joint_task_torques);
+				// 	command_torques = joint_task_torques;
+				// }
+				// // joint_task->updateTaskModel(N_prec);
+
+				// // joint_task->computeTorques(joint_task_torques);
+				// // command_torques = joint_task_torques;
 			}
 			break;
 
 			case RETURN_AND_POSE: {
+				posori_task->reInitializeTask();
 				cout<<"RETURN_AND_POSE\n\r";
 				// update task model and set hierarchy
 				N_prec.setIdentity();
