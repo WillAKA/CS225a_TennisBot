@@ -270,6 +270,11 @@ int main() {
 	int count = 0;
 	// pair<double,double> hit_point;
 	double hit_param[6]; // x,y,speed, theta1, theta2, time
+
+	bool hittingBool = true;
+
+
+
 	while (runloop) {
 		
 
@@ -295,12 +300,7 @@ int main() {
 		// update model
 		robot->updateModel();
 	
-		// based on ball condition determine the robot state
-		if (state != INITIALIZING){
-			if(ball_v(1)<0 && ball_p(1)<6 && ball_p(1) > robot->_q(1)-6.0){
-				state = MOVE_AND_SWING;
-			} else state = RETURN_AND_POSE;
-		}
+		
 
 
 		switch(state) {
@@ -337,6 +337,7 @@ int main() {
 					//q_init_desired(1) = 0;
 					joint_task->_desired_position(0) = -0.5;
 					joint_task->_desired_position(1) = 0.0;
+					joint_task->_desired_position(3) = -2.0;
 
 					cout << joint_task->_desired_position << "\n\r";
 					
@@ -350,13 +351,26 @@ int main() {
 				hitting_spot(ball_p.head(3), ball_v.head(3), HITZ, {robot->_q(0),robot->_q(1)-5.0}, {0., 5.0}, 2.0, hit_param);
 				// cout << "x: " << hit_param[0] << "y: " << hit_param[1] << " swing_speed: " << hit_param[2] << " theta1: " << hit_param[3] << " theta2: " << hit_param[4] << " time: " << hit_param[5];
 
-				joint_task->_desired_position(0) = hit_param[0] - BASE_HIT_OFF_X;
-				joint_task->_desired_position(1) = hit_param[1] + 5.0 - BASE_HIT_OFF_Y;
+				//joint_task->_desired_position(0) = hit_param[0] - BASE_HIT_OFF_X;
+				//joint_task->_desired_position(1) = hit_param[1] + 5.0 - BASE_HIT_OFF_Y;
 
-				if(hit_param[5] > 0 && hit_param[5] < 0.2){
-					joint_task->_use_interpolation_flag = false;
+				if(hit_param[5] > 0 && hit_param[5] < 0.4 && hittingBool){
+					cout << "HITTING\n\r";
+					joint_task->_use_interpolation_flag = true;
 					// cout << "swing speed!" << hit_param[2]<< " ";
 					joint_task->_desired_position(3) = 1;
+					hittingBool = false;
+					
+
+
+					joint_task->_kp = 1000.0;
+					joint_task->_kv = 500.0;
+					VectorXd maxVelocities = VectorXd::Zero(dof);
+					maxVelocities << M_PI/3,M_PI/3,10*M_PI/3,10*M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3;
+					joint_task->_otg->setMaxVelocity(maxVelocities);
+					joint_task->_otg->setMaxAcceleration(1000*M_PI);
+
+
 					// joint_task->_desired_velocity(3) = hit_param[2]/swing_arm_length;
 				}
 
@@ -367,25 +381,54 @@ int main() {
 				// cout << "joint_task_torques.size()" << joint_task_torques.size() << endl;
 				// cout << joint_task_torques(0) << " " << joint_task_torques(1) << " " << joint_task_torques(2) << " " << joint_task_torques(3) <<endl;
 				command_torques = joint_task_torques;
+
+				if (state != INITIALIZING){
+					if(ball_v(1)<0 && ball_p(1)<6 && ball_p(1) > robot->_q(1)-6.0){
+						
+						state = MOVE_AND_SWING;
+					} else {
+						joint_task->_desired_position(0) = -0.5;
+						joint_task->_desired_position(1) = 0.0;
+						joint_task->_desired_position(3) = -2.0;
+						joint_task->_kp = 50.0;
+						joint_task->_kv = 14.0;
+						VectorXd maxVelocities = VectorXd::Zero(dof);
+						maxVelocities << M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3;
+						joint_task->_otg->setMaxVelocity(maxVelocities);
+						joint_task->_otg->setMaxAcceleration(M_PI);
+
+
+						state = RETURN_AND_POSE;
+					}
+				}
 			}
 			break;
 
 			case RETURN_AND_POSE: {
 				cout<<"RETURN_AND_POSE\n\r";
-				// update task model and set hierarchy
-				N_prec.setIdentity();
-				//posori_task->updateTaskModel(N_prec);
-				//N_prec = posori_task->_N;
-				joint_task->_desired_position(0) = -0.5;
-				joint_task->_desired_position(1) = 0.0;
-				joint_task->_desired_position(3) = -2.0;
-				joint_task->updateTaskModel(N_prec);
-
 				// compute torques
 				joint_task->computeTorques(joint_task_torques);
-				//posori_task->computeTorques(posori_task_torques);
 
 				command_torques = joint_task_torques;// + posori_task_torques;
+				// based on ball condition determine the robot state
+				if (state != INITIALIZING){
+					if(ball_v(1)<0 && ball_p(1)<4 && ball_p(1) > robot->_q(1)-6.0){
+						state = MOVE_AND_SWING;
+						hittingBool = true;
+						hitting_spot(ball_p.head(3), ball_v.head(3), HITZ, {robot->_q(0),robot->_q(1)-5.0}, {0., 5.0}, 2.0, hit_param);
+						joint_task->_desired_position(0) = hit_param[0] - BASE_HIT_OFF_X;
+						joint_task->_desired_position(1) = hit_param[1] + 5.0 - BASE_HIT_OFF_Y;
+
+
+
+
+					} else {
+						 state = RETURN_AND_POSE;
+						// joint_task->_kp = 200.0;
+						//q_init_desired(0) = -0.5;
+						//q_init_desired(1) = 0;
+					}
+				}
 			}
 			break;
 		
