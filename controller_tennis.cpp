@@ -364,11 +364,11 @@ int main() {
 
 
 					joint_task->_kp = 1000.0;
-					joint_task->_kv = 500.0;
+					joint_task->_kv = 50.0;
 					VectorXd maxVelocities = VectorXd::Zero(dof);
-					maxVelocities << M_PI/3,M_PI/3,10*M_PI/3,10*M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3;
+					maxVelocities << M_PI/3,M_PI/3,M_PI/3,4*M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3;
 					joint_task->_otg->setMaxVelocity(maxVelocities);
-					joint_task->_otg->setMaxAcceleration(1000*M_PI);
+					joint_task->_otg->setMaxAcceleration(10*M_PI);
 
 
 					// joint_task->_desired_velocity(3) = hit_param[2]/swing_arm_length;
@@ -390,10 +390,10 @@ int main() {
 						joint_task->_desired_position(0) = -0.5;
 						joint_task->_desired_position(1) = 0.0;
 						joint_task->_desired_position(3) = -2.0;
-						joint_task->_kp = 50.0;
-						joint_task->_kv = 14.0;
+						joint_task->_kp = 250.0;
+						joint_task->_kv = 25.0;
 						VectorXd maxVelocities = VectorXd::Zero(dof);
-						maxVelocities << M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3;
+						maxVelocities << 3*M_PI/3,3*M_PI/3,M_PI/3,3*M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3;
 						joint_task->_otg->setMaxVelocity(maxVelocities);
 						joint_task->_otg->setMaxAcceleration(M_PI);
 
@@ -539,7 +539,12 @@ int main() {
 
 		// send to redis
 		//cout << "Command torques   :\n\r" << command_torques << "\n\r\n\r";
-		redis_client.setEigenMatrixJSON(JOINT_TORQUES_COMMANDED_KEY, command_torques);
+
+
+		if (controller_counter %10 == 0) {
+			redis_client.setEigenMatrixJSON(JOINT_TORQUES_COMMANDED_KEY, command_torques);
+		}
+		
 
 		controller_counter++;
 	}
