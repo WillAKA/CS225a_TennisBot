@@ -346,6 +346,9 @@ int main() {
 					//joint_task->_desired_position(7) = hitJointPos(7)+45.0*M_PI/180;
 					//joint_task->_desired_position(8) = -0.0;
 					//joint_task->_desired_position(9) = -0.0;
+
+					joint_task->_kp = 250.0;
+					joint_task->_kv = 50.0;
 					
 
 					//cout << joint_task->_desired_position << "\n\r";
@@ -373,7 +376,7 @@ int main() {
 				cout << hit_param[3]*180/M_PI << "\n\r";
 				cout << hit_param[4]*180/M_PI << "\n\r\n\r";
 
-				if(hit_param[5] > 0 && hit_param[5] < 0.2 && hittingBool){
+				if(hit_param[5] > 0 && hit_param[5] < 0.15 && hittingBool){
 					cout << "HITTING\n\r";
 					joint_task->_use_interpolation_flag = true;
 					// cout << "swing speed!" << hit_param[2]<< " ";
