@@ -247,7 +247,7 @@ int main() {
 			camera_pos = camera_lookat + m_pan*(camera_pos - camera_lookat);
 		}
 		graphics->setCameraPose(camera_name, camera_pos, cam_up_axis, camera_lookat);
-		graphics->getCamera(camera_name)->setClippingPlanes(1,20);
+		graphics->getCamera(camera_name)->setClippingPlanes(1,30);
 		glfwGetCursorPos(window, &last_cursorx, &last_cursory);
 
 		ui_force_widget->setEnable(fRobotLinkSelect);
@@ -280,9 +280,9 @@ int main() {
 			object->_q(0) = 0.0;
 			object->_q(1) = 0.0;
 			object->_q(2) = 0.0;
-			object->_dq(0) = -.5+0.01*(rand()%100);
-			object->_dq(1) = -9.0+0.02*(rand()%100);
-			object->_dq(2) = 2.0;
+			object->_dq(0) = -1.5+0.03*(rand()%100);
+			object->_dq(1) = -12.0+0.03*(rand()%100);
+			object->_dq(2) = 2.0 + 0.005*(rand()%100);
 			object->_dq(3) = 0.0; // x spin
 			object->_dq(4) = 0.0; // x spin
 			object->_dq(5) = 0.0; // x spin

@@ -26,7 +26,7 @@ const string robot_file = "./resources/mmp_panda.urdf";
 #define RETURN_AND_POSE     2
           
 #define G 9.81
-#define HITZ 1.1
+#define HITZ 1.0
 #define BASE_HIT_OFF_X      0.8
 #define BASE_HIT_OFF_Y      0.0
 
@@ -150,17 +150,13 @@ void hitting_spot(Vector3d ball_p, Vector3d ball_v, double hit_z, pair<double, d
 	// t_hit_land: the time it takes from hit to land
 	double y0 = potential_hit_spots[index].first.second;
 	double yd = land.second;
+	cout<<"t_hit delta: " << 2*(yd-y0)*(yd*hit_z-(yd-y0)*z_at_net)/(G*y0*yd)<<endl;
 	double t_hit_land = sqrt(2*(yd-y0)*(yd*hit_z-(yd-y0)*z_at_net)/(G*y0*yd));
 	double vox = (land.first - potential_hit_spots[index].first.first)/t_hit_land; // v out x
 	double voy = (land.second- potential_hit_spots[index].first.second)/t_hit_land;// v out y
 	double voz = 0.5*G*t_hit_land-hit_z/t_hit_land;										   // v out z
 
-	// neglecting spin for now, assume after hitting, the normal relative speed is scaled by alpha1 
-	// and the parallel relative speed is scaled by alpha2 
-	double alpha1 = 0.7;
-	double alpha2 = 0.9;
-
-	double approx_alpha_square = 0.75*0.75; // first parameter to tune, value should be 0.7^2 to 0.8^2 : in the racket frame, assume |v_out| = approx_alpha * |v_in|
+	double approx_alpha_square = 0.5*0.5; // first parameter to tune, value should be 0.7^2 to 0.8^2 : in the racket frame, assume |v_out| = approx_alpha * |v_in|
 	double a = 1 - approx_alpha_square;
 	double b = 2*approx_alpha_square*ball_v(1)-2*voy;
 	double c = vox*vox+voy*voy+voz*voz-approx_alpha_square*(ball_v(0)*ball_v(0)+ball_v(1)*ball_v(1)+ball_v(2)*ball_v(2));
@@ -311,7 +307,7 @@ int main() {
 
 				joint_task->_desired_position = q_init_desired;
 				posori_task->_desired_position = Vector3d(0.75,0.0,0.5);
-				posori_task->_desired_orientation = AngleAxisd(-M_PI/2, Vector3d::UnitY()).toRotationMatrix() * AngleAxisd(-M_PI/2, Vector3d::UnitX()).toRotationMatrix() * AngleAxisd(M_PI/8, Vector3d::UnitY()).toRotationMatrix();	
+				posori_task->_desired_orientation = AngleAxisd(-M_PI/2, Vector3d::UnitY()).toRotationMatrix() * AngleAxisd(-M_PI/2, Vector3d::UnitX()).toRotationMatrix() * AngleAxisd(0, Vector3d::UnitY()).toRotationMatrix();	
 
 				N_prec.setIdentity();
 				posori_task->updateTaskModel(N_prec);
@@ -340,6 +336,11 @@ int main() {
 
 					cout << joint_task->_desired_position << "\n\r";
 					
+					VectorXd maxVelocities = VectorXd::Zero(dof);
+					maxVelocities << 6*M_PI/3,6*M_PI/3,M_PI/3,5*M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3;
+					joint_task->_otg->setMaxVelocity(maxVelocities);
+					joint_task->_otg->setMaxAcceleration(2*M_PI);
+
 					state = RETURN_AND_POSE;
 				}
 			}
@@ -347,16 +348,24 @@ int main() {
 
 			case MOVE_AND_SWING: {
 				cout<<"MOVE_AND_SWING\n\r";
-				hitting_spot(ball_p.head(3), ball_v.head(3), HITZ, {robot->_q(0),robot->_q(1)-5.0}, {0., 5.0}, 2.0, hit_param);
-				// cout << "x: " << hit_param[0] << "y: " << hit_param[1] << " swing_speed: " << hit_param[2] << " theta1: " << hit_param[3] << " theta2: " << hit_param[4] << " time: " << hit_param[5];
+				hitting_spot(ball_p.head(3), ball_v.head(3), HITZ, {robot->_q(0),robot->_q(1)-5.0}, {4.0, 5.0}, 2.0, hit_param);
+				cout << "x: " << hit_param[0] << "y: " << hit_param[1] << " swing_speed: " << hit_param[2] << " theta1: " << hit_param[3] << " theta2: " << hit_param[4] << " time: " << hit_param[5];
 
 				joint_task->_desired_position(0) = hit_param[0] - BASE_HIT_OFF_X;
 				joint_task->_desired_position(1) = hit_param[1] + 5.0 - BASE_HIT_OFF_Y;
+				joint_task->_desired_position(7) = -2.50965+hit_param[4];
 
-				if(hit_param[5] > 0 && hit_param[5] < 0.2){
-					joint_task->_use_interpolation_flag = false;
-					// cout << "swing speed!" << hit_param[2]<< " ";
+				if(hit_param[5] > 0 && hit_param[5] < 0.16+(0.4-hit_param[3])/hit_param[2]){
+					// joint_task->_use_interpolation_flag = true;
+					cout << "swing speed!" << hit_param[2]<< " ";
 					joint_task->_desired_position(3) = 1;
+
+					joint_task->_kp = 2000.0;
+					joint_task->_kv = 50.0;
+					VectorXd maxVelocities = VectorXd::Zero(dof);
+					maxVelocities << 2.0, 2.0, M_PI/3, hit_param[2]/0.75, M_PI/3, M_PI/3,M_PI/3,3*M_PI/3,M_PI/3,M_PI/3;
+					joint_task->_otg->setMaxVelocity(maxVelocities);
+					joint_task->_otg->setMaxAcceleration(20*M_PI);
 					// joint_task->_desired_velocity(3) = hit_param[2]/swing_arm_length;
 				}
 
@@ -378,126 +387,26 @@ int main() {
 				//N_prec = posori_task->_N;
 				joint_task->_desired_position(0) = -0.5;
 				joint_task->_desired_position(1) = 0.0;
-				joint_task->_desired_position(3) = -2.0;
+				joint_task->_desired_position(3) = -1.5;
+				joint_task->_desired_position(7) = -2.50965+M_PI/6;
 				joint_task->updateTaskModel(N_prec);
 
 				// compute torques
 				joint_task->computeTorques(joint_task_torques);
 				//posori_task->computeTorques(posori_task_torques);
-
+				cout << "joint(7): " << robot->_q(7);
 				command_torques = joint_task_torques;// + posori_task_torques;
 			}
 			break;
 		
 		}
 
-
-
-
-
-
-		/*if(state == HITTING)
-		{
-			 cout << "\n\r\n\rHITTING\n";
-			joint_task->_kp = 250.0;
-			hit_point = hitting_spot(ball_p.head(3), ball_v.head(3), HITZ, {robot->_q(0),robot->_q(1)-8.0});
-			q_init_desired(0) = hit_point.first-0.3;
-			q_init_desired(1) = hit_point.second;
-			if(count % 200 == 0){
-				cout << "ball_p.head(3) " << ball_p.head(3) << "\nball_v.head(3) " << ball_v.head(3) << "\nrobot->_q " << robot->_q(0) << " " << robot->_q(1)-8.0 << endl;
-				cout << " q_init_desired: " << q_init_desired(0) << ", " << q_init_desired(1)<<endl;
-			}
-			joint_task->_desired_position = q_init_desired;
-			// update task model and set hierarchy
-			N_prec.setIdentity();
-			joint_task->updateTaskModel(N_prec);
-
-			// compute torques
-			joint_task->computeTorques(joint_task_torques);
-
-			command_torques = joint_task_torques;
-
-			if( (robot->_q - q_init_desired).norm() < 0.15 )
-			{
-				posori_task->reInitializeTask();
-				// Just adjust orientation at the end
-				// Acceleration of the base to hit the base
-				// Use joint 4
-				posori_task->_desired_position = Vector3d(0.75,0.0,0.5);
-				//Vector3d Position = Vector3d(0,0.75,1) - robot1_inWorld;
-				//posori_task->_otg->setGoalPositionAndLinearVelocity(Position, Vector3d(1.0,1.0,1.0));
-				
-				//posori_task->_desired_velocity = Vector3d(1,1,1);
-				
-				posori_task->_desired_orientation = AngleAxisd(-M_PI/2, Vector3d::UnitY()).toRotationMatrix() * posori_task->_desired_orientation;
-				
-				posori_task->_desired_orientation = AngleAxisd(-M_PI/10, Vector3d::UnitX()).toRotationMatrix() * posori_task->_desired_orientation;
-				
-
-				joint_task->reInitializeTask();
-				
-
-				
-
-				//state = POSORI_CONTROLLER;
-			}
-		}*/
-/*
-		else if(state == POSORI_CONTROLLER)
-		{
-			// cout << "POSORI\n";
-			joint_task->_kp = 10;
-			//cout << "Bye\n\r";			
-			// update task model and set hierarchy
-			N_prec.setIdentity();
-			posori_task->updateTaskModel(N_prec);
-			N_prec = posori_task->_N;
-			joint_task->updateTaskModel(N_prec);
-
-			// compute torques
-			posori_task->computeTorques(posori_task_torques);
-			joint_task->computeTorques(joint_task_torques);
-
-			command_torques = posori_task_torques + joint_task_torques;
-			
-			if (posori_task->goalOrientationReached(0.15,false) && test) {
-				//posori_task->reInitializeTask();
-				joint_task->reInitializeTask();
-				joint_task->_kp = 40;
-				//q_init_desired << 0.0,0.0,90.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
-				//q_init_desired << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
-				q_init_desired *= M_PI/180.0;
-				joint_task->_desired_position[3] = -180*M_PI/180.0;
-				//joint_task->_desired_position[1] = -.5;
-				state = SWING_ORIENT;
-
-			}
-			
-		} 
-		else if(state == SWING_ORIENT) {
-			N_prec.setIdentity();
-			joint_task->updateTaskModel(N_prec);
-			joint_task->computeTorques(joint_task_torques);
-			command_torques = joint_task_torques;
-		} else if (state == RETURNING){
-			 cout << "\n\r\n\rRETURNING\n";
-			joint_task->_kp = 250.0;
-			q_init_desired(0) = -0.5;
-			q_init_desired(1) = 0;
-			joint_task->_desired_position = q_init_desired;
-			// update task model and set hierarchy
-			N_prec.setIdentity();
-			joint_task->updateTaskModel(N_prec);
-
-			// compute torques
-
-			command_torques = joint_task_torques;
-		}*/
-
 		// send to redis
 		//cout << "Command torques   :\n\r" << command_torques << "\n\r\n\r";
-		redis_client.setEigenMatrixJSON(JOINT_TORQUES_COMMANDED_KEY, command_torques);
-
+		if (controller_counter %10 == 0) {
+			redis_client.setEigenMatrixJSON(JOINT_TORQUES_COMMANDED_KEY, command_torques);
+			// enforcedCommand = false;
+		}
 		controller_counter++;
 	}
 
