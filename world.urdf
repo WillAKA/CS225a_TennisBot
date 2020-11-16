@@ -11,9 +11,27 @@
 
 	<robot name="ball">
 		<model dir="./resources" path="tennisBall.urdf" name="ball" />
-		<origin xyz="0.0 5.0 2.0" rpy="0 0 0" />
-
+		<origin xyz="0 9 .7" rpy="0 0 0" />
 	</robot>
+
+	<robot name="turret_shooter">
+		<model dir="./resources" path="turret_shooter.urdf" name="TurretShooter" />
+		<origin xyz="0 9 0" rpy="0 0 3.1415926535897932" />
+	</robot>
+
+	<!-- <robot name="cannon_shooter">
+		<model dir="./resources" path="cannon_shooter.urdf" name="CannonShooter" />
+		<origin xyz="0 -5 0" rpy="0 0 3.1415926535897932" />
+	</robot> -->
+
+
+
+
+
+
+
+
+
 
 	<!-- <static_object name="Ground_With_Texture">
 		<origin xyz="0.0 0.0 0.0" rpy="0 0 0" />
@@ -59,26 +77,58 @@
 
 	<static_object name="Net">
 		<origin xyz="0.0 0.0 0.0" rpy="0 0 0" />
-		<!-- <collision>
-	        <origin xyz="0.0 0.0 -0.0001" rpy="0 0 0" />
+		<collision>
+	        <origin xyz="0.0 0.0 -0.0001" rpy="0 0 1.57079632679" />
 	        <geometry>
 	            <mesh filename="./resources/../../../CS225a_TennisBot/Objects/Visual/TennisNetCollisionMesh.obj" scale="1.0 1.0 1.0"/>
 	        </geometry>
-	    </collision> -->
+	    </collision>
 	    <visual>
 	    	<!-- <origin xyz="0.0 0.0 -0.1" rpy="0 0 0" /> -->
 	        <origin xyz="0.0 0.0 -0.0001" rpy="0 0 1.57079632679" />
 	        <geometry>
 	            <mesh filename="./resources/../../../CS225a_TennisBot/Objects/Visual/TennisNet.obj" scale="1.0 1.0 1.0"/>
+
 	        </geometry>
-<!-- 	        <material name="material">
-		        <color rgba="1 0.5 0.5 .1" />
-	        </material> -->
-	        <!-- <material name="material">
-		        <texture filename="./resources/../../../CS225a_TennisBot/Objects/Visual/TennisNet.mtl"/>
-	        </material> -->
 	    </visual>
 	</static_object>
+
+
+	<static_object name="Turret_Base">
+		<origin xyz="0.0 9 0.0" rpy="0 0 3.1415926535897932" />
+	    <visual>
+	        <origin xyz="0 0 0" rpy="0 0 0" />
+	        <geometry>
+	            <mesh filename="./resources/../../../CS225a_TennisBot/Objects/Visual/TurretBase.obj" scale="1.0 1.0 1.0"/>
+	        </geometry>
+		        <color rgba="1 0.5 0.5 .1" />
+	    </visual>
+	</static_object>
+
+
+	<!-- <static_object name="Cannon_Base">
+		<origin xyz="0.0 -5 0.0" rpy="0 0 3.1415926535897932" />
+	    <visual>
+	        <origin xyz="0 0 0" rpy="0 0 0" />
+	        <geometry>
+	            <mesh filename="./resources/../../../CS225a_TennisBot/Objects/Visual/CannonBase.obj" scale="1.0 1.0 1.0"/>
+	        </geometry>
+		        <color rgba="1 0.5 0.5 .1" />
+	    </visual>
+	</static_object> -->
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 	<!-- <static_object name="Companion_Cube">

@@ -29,6 +29,8 @@ const string robot_file = "./resources/mmp_panda.urdf";
 #define HITZ 1.0
 #define BASE_HIT_OFF_X      0.8
 #define BASE_HIT_OFF_Y      0.0
+#define RETURN_POS_X		0.0
+#define RETURN_POS_Y		-5.5
 
 double swing_arm_length = BASE_HIT_OFF_X;
 
@@ -143,7 +145,7 @@ void hitting_spot(Vector3d ball_p, Vector3d ball_v, double hit_z, pair<double, d
 	} else{
 		hit_param[0] = potential_hit_spots[index].first.first;
 		hit_param[1] = potential_hit_spots[index].first.second;
-	    hit_param[5] = potential_hit_spots[index].second;
+	    	hit_param[5] = potential_hit_spots[index].second;
 	}
 
 	// Now calculate parameters related to swing speed and orientation.
@@ -162,7 +164,7 @@ void hitting_spot(Vector3d ball_p, Vector3d ball_v, double hit_z, pair<double, d
 	double c = vox*vox+voy*voy+voz*voz-approx_alpha_square*(ball_v(0)*ball_v(0)+ball_v(1)*ball_v(1)+ball_v(2)*ball_v(2));
 	double sqrt_delta = sqrt(b*b-4*a*c);
 	if(b*b-4*a*c<0){
-		cout << "ERROR: NO swing speed" << endl;
+		// cout << "ERROR: NO swing speed" << endl;
 	}
 	double swing_speed = (-b - sqrt_delta)/(2*a);
 	if(swing_speed < 0){
@@ -266,6 +268,13 @@ int main() {
 	int count = 0;
 	// pair<double,double> hit_point;
 	double hit_param[6]; // x,y,speed, theta1, theta2, time
+
+	bool hittingBool = true;
+	bool enforcedCommand = false;
+	VectorXd hitJointPos = VectorXd::Zero(dof);
+
+
+
 	while (runloop) {
 		
 
@@ -291,23 +300,18 @@ int main() {
 		// update model
 		robot->updateModel();
 	
-		// based on ball condition determine the robot state
-		if (state != INITIALIZING){
-			if(ball_v(1)<0 && ball_p(1)<6 && ball_p(1) > robot->_q(1)-6.0){
-				state = MOVE_AND_SWING;
-			} else state = RETURN_AND_POSE;
-		}
+		
 
 
 		switch(state) {
 			case INITIALIZING: {
-				cout << "Initilizing\n\r";
+				// cout << "Initilizing\n\r";
 				N_prec.setIdentity();
 				joint_task->updateTaskModel(N_prec);
 
 				joint_task->_desired_position = q_init_desired;
 				posori_task->_desired_position = Vector3d(0.75,0.0,0.5);
-				posori_task->_desired_orientation = AngleAxisd(-M_PI/2, Vector3d::UnitY()).toRotationMatrix() * AngleAxisd(-M_PI/2, Vector3d::UnitX()).toRotationMatrix() * AngleAxisd(0, Vector3d::UnitY()).toRotationMatrix();	
+				posori_task->_desired_orientation = AngleAxisd(-M_PI/2, Vector3d::UnitY()).toRotationMatrix() * AngleAxisd(-M_PI/2, Vector3d::UnitX()).toRotationMatrix() * AngleAxisd(M_PI/5, Vector3d::UnitY()).toRotationMatrix();	
 
 				N_prec.setIdentity();
 				posori_task->updateTaskModel(N_prec);
@@ -331,10 +335,26 @@ int main() {
 					// joint_task->_kp = 200.0;
 					//q_init_desired(0) = -0.5;
 					//q_init_desired(1) = 0;
-					joint_task->_desired_position(0) = -0.5;
-					joint_task->_desired_position(1) = 0.0;
+					joint_task->_desired_position(0) = RETURN_POS_X;
+					joint_task->_desired_position(1) = RETURN_POS_Y;
+					joint_task->_desired_position(3) = -1.0;
 
-					cout << joint_task->_desired_position << "\n\r";
+					hitJointPos = joint_task->_desired_position;
+					
+					//joint_task->_desired_position(7) = hitJointPos(7)+45.0*M_PI/180;
+					//joint_task->_desired_position(8) = -0.0;
+					//joint_task->_desired_position(9) = -0.0;
+
+					joint_task->_kp = 250.0;
+					joint_task->_kv = 50.0;
+					
+
+					//cout << joint_task->_desired_position << "\n\r";
+
+					VectorXd maxVelocities = VectorXd::Zero(dof);
+					maxVelocities << 6*M_PI/3,6*M_PI/3,M_PI/3,5*M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3;
+					joint_task->_otg->setMaxVelocity(maxVelocities);
+					joint_task->_otg->setMaxAcceleration(2*M_PI);
 					
 					VectorXd maxVelocities = VectorXd::Zero(dof);
 					maxVelocities << 6*M_PI/3,6*M_PI/3,M_PI/3,5*M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3;
@@ -363,6 +383,7 @@ int main() {
 					joint_task->_kp = 2000.0;
 					joint_task->_kv = 50.0;
 					VectorXd maxVelocities = VectorXd::Zero(dof);
+
 					maxVelocities << 2.0, 2.0, M_PI/3, hit_param[2]/0.75, M_PI/3, M_PI/3,M_PI/3,3*M_PI/3,M_PI/3,M_PI/3;
 					joint_task->_otg->setMaxVelocity(maxVelocities);
 					joint_task->_otg->setMaxAcceleration(20*M_PI);
@@ -376,6 +397,28 @@ int main() {
 				// cout << "joint_task_torques.size()" << joint_task_torques.size() << endl;
 				// cout << joint_task_torques(0) << " " << joint_task_torques(1) << " " << joint_task_torques(2) << " " << joint_task_torques(3) <<endl;
 				command_torques = joint_task_torques;
+
+				if (state != INITIALIZING){
+					if(ball_v(1)<0 && ball_p(1)<6 && ball_p(1) > robot->_q(1)-6.0){
+						
+						state = MOVE_AND_SWING;
+					} else {
+						//enforcedCommand = true;
+						joint_task->_use_interpolation_flag = true;
+						joint_task->_desired_position(0) = RETURN_POS_X;
+						joint_task->_desired_position(1) = RETURN_POS_Y;
+						joint_task->_desired_position(3) = -1.0;
+						joint_task->_kp = 250.0;
+						joint_task->_kv = 50.0;
+						VectorXd maxVelocities = VectorXd::Zero(dof);
+						maxVelocities << 6*M_PI/3,6*M_PI/3,M_PI/3,5*M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3;
+						joint_task->_otg->setMaxVelocity(maxVelocities);
+						joint_task->_otg->setMaxAcceleration(2*M_PI);
+
+
+						state = RETURN_AND_POSE;
+					}
+				}
 			}
 			break;
 
@@ -394,12 +437,16 @@ int main() {
 				// compute torques
 				joint_task->computeTorques(joint_task_torques);
 				//posori_task->computeTorques(posori_task_torques);
-				cout << "joint(7): " << robot->_q(7);
+
 				command_torques = joint_task_torques;// + posori_task_torques;
-			}
-			break;
-		
-		}
+				// based on ball condition determine the robot state
+				if (state != INITIALIZING){
+					if(ball_v(1)<0 && ball_p(1)<4 && ball_p(1) > robot->_q(1)-6.0){
+						state = MOVE_AND_SWING;
+						hittingBool = true;
+						hitting_spot(ball_p.head(3), ball_v.head(3), HITZ, {robot->_q(0),robot->_q(1)-5.0}, {0., 5.0}, 2.0, hit_param);
+						joint_task->_desired_position(0) = hit_param[0] - BASE_HIT_OFF_X;
+						joint_task->_desired_position(1) = hit_param[1] + 5.0 - BASE_HIT_OFF_Y;
 
 		// send to redis
 		//cout << "Command torques   :\n\r" << command_torques << "\n\r\n\r";
@@ -407,6 +454,7 @@ int main() {
 			redis_client.setEigenMatrixJSON(JOINT_TORQUES_COMMANDED_KEY, command_torques);
 			// enforcedCommand = false;
 		}
+
 		controller_counter++;
 	}
 
