@@ -29,6 +29,8 @@ const string robot_file = "./resources/mmp_panda.urdf";
 #define HITZ 1.0
 #define BASE_HIT_OFF_X      0.8
 #define BASE_HIT_OFF_Y      0.0
+#define RETURN_POS_X		0.0
+#define RETURN_POS_Y		-5.5
 
 double swing_arm_length = BASE_HIT_OFF_X;
 
@@ -337,8 +339,8 @@ int main() {
 					// joint_task->_kp = 200.0;
 					//q_init_desired(0) = -0.5;
 					//q_init_desired(1) = 0;
-					joint_task->_desired_position(0) = -0.5;
-					joint_task->_desired_position(1) = 0.0;
+					joint_task->_desired_position(0) = RETURN_POS_X;
+					joint_task->_desired_position(1) = RETURN_POS_Y;
 					joint_task->_desired_position(3) = -1.0;
 
 					hitJointPos = joint_task->_desired_position;
@@ -411,8 +413,8 @@ int main() {
 					} else {
 						//enforcedCommand = true;
 						joint_task->_use_interpolation_flag = true;
-						joint_task->_desired_position(0) = -0.5;
-						joint_task->_desired_position(1) = 0.0;
+						joint_task->_desired_position(0) = RETURN_POS_X;
+						joint_task->_desired_position(1) = RETURN_POS_Y;
 						joint_task->_desired_position(3) = -1.0;
 						joint_task->_kp = 250.0;
 						joint_task->_kv = 50.0;
