@@ -80,6 +80,13 @@ int main() {
 	// load graphics scene
 	auto graphics = new Sai2Graphics::Sai2Graphics(world_file, true);
 
+	// Sets background color
+	const GLfloat r = 135.0/255;
+	const GLfloat g = 206.0/255;
+	const GLfloat b = 235.0/255;
+	graphics->_world->setBackgroundColor(r, g, b);
+	// graphics->setBackgroundColor(r, g, b)
+
 	// setup camera 
 	Eigen::Vector3d camera_pos, camera_lookat, camera_vertical;
 	camera_pos << 0, -9, 3.0;
@@ -247,7 +254,7 @@ int main() {
 			camera_pos = camera_lookat + m_pan*(camera_pos - camera_lookat);
 		}
 		graphics->setCameraPose(camera_name, camera_pos, cam_up_axis, camera_lookat);
-		graphics->getCamera(camera_name)->setClippingPlanes(1,20);
+		graphics->getCamera(camera_name)->setClippingPlanes(1,40);
 		glfwGetCursorPos(window, &last_cursorx, &last_cursory);
 
 		ui_force_widget->setEnable(fRobotLinkSelect);
@@ -475,4 +482,5 @@ void mouseClick(GLFWwindow* window, int button, int action, int mods) {
 			break;
 	}
 }
+
 
