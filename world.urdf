@@ -9,6 +9,11 @@
 		<origin xyz="0 -5.0 0.5" rpy="0 0 0" />
 	</robot>
 
+	<robot name="mmp_panda_2">
+		<model dir="./resources" path="mmp_panda.urdf" name="mmp_panda_2" />
+		<origin xyz="0 5.0 0.5" rpy="0 0 3.14159265359" />
+	</robot>
+
 	<robot name="ball">
 		<model dir="./resources" path="tennisBall.urdf" name="ball" />
 		<origin xyz="0.0 5.0 2.0" rpy="0 0 0" />

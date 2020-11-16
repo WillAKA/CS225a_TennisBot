@@ -20,6 +20,7 @@ using namespace std;
 using namespace Eigen;
 
 const string robot_file = "./resources/mmp_panda.urdf";
+const string robot_file_2 = "./resources/mmp_panda.urdf";
 
 #define INITIALIZING        0
 #define MOVE_AND_SWING      1
@@ -33,16 +34,20 @@ const string robot_file = "./resources/mmp_panda.urdf";
 double swing_arm_length = BASE_HIT_OFF_X;
 
 int state = INITIALIZING;
+int state2 = INITIALIZING;
 
 // redis keys:
 // - read:
 std::string JOINT_ANGLES_KEY;
 std::string JOINT_VELOCITIES_KEY;
+std::string JOINT_ANGLES_KEY_2;
+std::string JOINT_VELOCITIES_KEY_2;
 std::string JOINT_TORQUES_SENSED_KEY;
 std::string OBJ_POSITION_KEY;
 std::string OBJ_VELOCITIES_KEY;
 // - write
 std::string JOINT_TORQUES_COMMANDED_KEY;
+std::string JOINT_TORQUES_COMMANDED_KEY_2;
 
 // - model
 std::string MASSMATRIX_KEY;
@@ -189,7 +194,10 @@ void hitting_spot(Vector3d ball_p, Vector3d ball_v, double hit_z, pair<double, d
 int main() {
 	JOINT_ANGLES_KEY = "sai2::cs225a::project::sensors::q";
 	JOINT_VELOCITIES_KEY = "sai2::cs225a::project::sensors::dq";
+	JOINT_ANGLES_KEY_2 = "sai2::cs225a::project2::sensors::q";
+	JOINT_VELOCITIES_KEY_2 = "sai2::cs225a::project2::sensors::dq";
 	JOINT_TORQUES_COMMANDED_KEY = "sai2::cs225a::project::actuators::fgc";
+	JOINT_TORQUES_COMMANDED_KEY_2 = "sai2::cs225a::project2::actuators::fgc";
 	OBJ_POSITION_KEY  = "cs225a::robot::ball::sensors::q";
 	OBJ_VELOCITIES_KEY = "cs225a::robot::ball::sensors::dq";
 
@@ -209,6 +217,12 @@ int main() {
 	VectorXd initial_dq = robot->_dq;
 	robot->updateModel();
 
+	auto robot2 = new Sai2Model::Sai2Model(robot_file_2, false);
+	robot2->_q = redis_client.getEigenMatrixJSON(JOINT_ANGLES_KEY_2);
+	VectorXd initial_q_2 = robot2->_q;
+	VectorXd initial_dq_2 = robot2->_dq;
+	robot2->updateModel();
+
 	// position and velocity of the ball (without creating a robot object)
 	VectorXd ball_p(6);
 	VectorXd ball_v(6);
@@ -216,17 +230,22 @@ int main() {
 	// prepare controller
 	int dof = robot->dof();
 	VectorXd command_torques = VectorXd::Zero(dof);
+	VectorXd command_torques_2 = VectorXd::Zero(dof);
 	MatrixXd N_prec = MatrixXd::Identity(dof, dof);
+	MatrixXd N_prec_2 = MatrixXd::Identity(dof, dof);
 
 	// pose task
 	const string control_link = "racquetlink";
 	const Vector3d control_point = Vector3d(0.0,0.45,0.0);
 	auto posori_task = new Sai2Primitives::PosOriTask(robot, control_link, control_point);
+	auto posori_task_2 = new Sai2Primitives::PosOriTask(robot2, control_link, control_point);
 
 #ifdef USING_OTG
 	posori_task->_use_interpolation_flag = true;
+	posori_task_2->_use_interpolation_flag = true;
 #else
 	posori_task->_use_velocity_saturation_flag = true;
+	posori_task_2->_use_velocity_saturation_flag = true;
 #endif
 	
 	VectorXd posori_task_torques = VectorXd::Zero(dof);
@@ -235,18 +254,31 @@ int main() {
 	posori_task->_kp_ori = 200.0;
 	posori_task->_kv_ori = 20.0;
 
+	VectorXd posori_task_torques_2 = VectorXd::Zero(dof);
+	posori_task_2->_kp_pos = 200.0;
+	posori_task_2->_kv_pos = 20.0;
+	posori_task_2->_kp_ori = 200.0;
+	posori_task_2->_kv_ori = 20.0;
+
 	// joint task
 	auto joint_task = new Sai2Primitives::JointTask(robot);
+	auto joint_task_2 = new Sai2Primitives::JointTask(robot2);
 
 #ifdef USING_OTG
 	joint_task->_use_interpolation_flag = true;
+	joint_task_2->_use_interpolation_flag = true;
 #else
 	joint_task->_use_velocity_saturation_flag = true;
+	joint_task_2->_use_velocity_saturation_flag = true;
 #endif
 
 	VectorXd joint_task_torques = VectorXd::Zero(dof);
 	joint_task->_kp = 70.0;
 	joint_task->_kv = 20.0;
+	
+	VectorXd joint_task_torques_2 = VectorXd::Zero(dof);
+	joint_task_2->_kp = 70.0;
+	joint_task_2->_kv = 20.0;
 
 	VectorXd q_init_desired = initial_q;
 	VectorXd dq_init_desired = initial_dq;
@@ -256,6 +288,9 @@ int main() {
 	q_init_desired *= M_PI/180.0;
 	joint_task->_desired_position = q_init_desired;
 	joint_task->_desired_velocity = dq_init_desired;
+	
+	joint_task_2->_desired_position = q_init_desired;
+	joint_task_2->_desired_velocity = dq_init_desired;
 
 	// create a timer
 	LoopTimer timer;
@@ -272,6 +307,7 @@ int main() {
 	double hit_param[6]; // x,y,speed, theta1, theta2, time
 
 	bool hittingBool = true;
+	bool hittingBool2 = true;
 	bool enforcedCommand = false;
 	VectorXd hitJointPos = VectorXd::Zero(dof);
 
@@ -301,18 +337,28 @@ int main() {
 
 		// update model
 		robot->updateModel();
+
+		// read robot state from redis
+		robot2->_q = redis_client.getEigenMatrixJSON(JOINT_ANGLES_KEY_2);
+		robot2->_dq = redis_client.getEigenMatrixJSON(JOINT_VELOCITIES_KEY_2);
+
+		// update model
+		robot2->updateModel();
 	
 		
 
 
 		switch(state) {
 			case INITIALIZING: {
-				cout << "Initilizing\n\r";
+				//cout << "Initilizing\n\r";
 				N_prec.setIdentity();
+
 				joint_task->updateTaskModel(N_prec);
 
 				joint_task->_desired_position = q_init_desired;
+
 				posori_task->_desired_position = Vector3d(0.75,0.0,0.5);
+
 				posori_task->_desired_orientation = AngleAxisd(-M_PI/2, Vector3d::UnitY()).toRotationMatrix() * AngleAxisd(-M_PI/2, Vector3d::UnitX()).toRotationMatrix() * AngleAxisd(M_PI/5, Vector3d::UnitY()).toRotationMatrix();	
 
 				N_prec.setIdentity();
@@ -320,13 +366,12 @@ int main() {
 				N_prec = posori_task->_N;
 				joint_task->updateTaskModel(N_prec);
 
-
-
 				joint_task->computeTorques(joint_task_torques);
 
 				posori_task->computeTorques(posori_task_torques);
 
 				command_torques = joint_task_torques + posori_task_torques;
+
 				
 				if( posori_task->goalOrientationReached(0.1,false) )
 				{
@@ -364,20 +409,20 @@ int main() {
 			break;
 
 			case MOVE_AND_SWING: {
-				cout<<"MOVE_AND_SWING\n\r";
+				//cout<<"MOVE_AND_SWING\n\r";
 				hitting_spot(ball_p.head(3), ball_v.head(3), HITZ, {robot->_q(0),robot->_q(1)-5.0}, {0., 5.0}, 2.0, hit_param);
 				// cout << "x: " << hit_param[0] << "y: " << hit_param[1] << " swing_speed: " << hit_param[2] << " theta1: " << hit_param[3] << " theta2: " << hit_param[4] << " time: " << hit_param[5];
 
 				joint_task->_desired_position(0) = hit_param[0] - BASE_HIT_OFF_X;
 				joint_task->_desired_position(1) = hit_param[1] + 5  - BASE_HIT_OFF_Y;
 				
-				cout << "Hello, parameters here\n\r";
-				cout << hit_param[2] << "\n\r";				
-				cout << hit_param[3]*180/M_PI << "\n\r";
-				cout << hit_param[4]*180/M_PI << "\n\r\n\r";
+				//cout << "Hello, parameters here\n\r";
+				//cout << hit_param[2] << "\n\r";				
+				//cout << hit_param[3]*180/M_PI << "\n\r";
+				//cout << hit_param[4]*180/M_PI << "\n\r\n\r";
 
 				if(hit_param[5] > 0 && hit_param[5] < 0.15 && hittingBool){
-					cout << "HITTING\n\r";
+					//cout << "HITTING\n\r";
 					joint_task->_use_interpolation_flag = true;
 					// cout << "swing speed!" << hit_param[2]<< " ";
 					joint_task->_desired_position(3) = 0.0;
@@ -429,7 +474,7 @@ int main() {
 			break;
 
 			case RETURN_AND_POSE: {
-				cout<<"RETURN_AND_POSE\n\r";
+				//cout<<"RETURN_AND_POSE\n\r";
 				// compute torques
 				joint_task->computeTorques(joint_task_torques);
 
@@ -458,13 +503,105 @@ int main() {
 		
 		}
 
+		
+		switch(state2) {
+			case INITIALIZING: {
+				N_prec_2.setIdentity();
+
+				joint_task_2->updateTaskModel(N_prec_2);
+
+				joint_task_2->_desired_position = q_init_desired;
+
+				posori_task_2->_desired_position = Vector3d(0.75,0.0,0.5);
+
+				posori_task_2->_desired_orientation = AngleAxisd(-M_PI/2, Vector3d::UnitY()).toRotationMatrix() * AngleAxisd(-M_PI/2, Vector3d::UnitX()).toRotationMatrix() * AngleAxisd(M_PI/5, Vector3d::UnitY()).toRotationMatrix();	
+
+
+				N_prec_2.setIdentity();
+				posori_task_2->updateTaskModel(N_prec_2);
+				N_prec_2 = posori_task_2->_N;
+				joint_task_2->updateTaskModel(N_prec_2);
+
+				joint_task_2->computeTorques(joint_task_torques_2);
+
+				posori_task_2->computeTorques(posori_task_torques_2);
+
+				command_torques_2 = joint_task_torques_2 + posori_task_torques_2;
+
+
+				if( posori_task_2->goalOrientationReached(0.1,false) )
+				{
+					joint_task_2->reInitializeTask();
+					N_prec_2.setIdentity();
+					joint_task_2->updateTaskModel(N_prec_2);
+
+					// joint_task->_kp = 200.0;
+					//q_init_desired(0) = -0.5;
+					//q_init_desired(1) = 0;
+					joint_task_2->_desired_position(0) = -0.5;
+					joint_task_2->_desired_position(1) = 0.0;
+					joint_task_2->_desired_position(3) = -1.0;
+
+					hitJointPos = joint_task->_desired_position;
+					
+					//joint_task->_desired_position(7) = hitJointPos(7)+45.0*M_PI/180;
+					//joint_task->_desired_position(8) = -0.0;
+					//joint_task->_desired_position(9) = -0.0;
+
+					joint_task_2->_kp = 250.0;
+					joint_task_2->_kv = 50.0;
+					
+
+					//cout << joint_task->_desired_position << "\n\r";
+
+					VectorXd maxVelocities_2 = VectorXd::Zero(dof);
+					maxVelocities_2 << 6*M_PI/3,6*M_PI/3,M_PI/3,5*M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3;
+					joint_task_2->_otg->setMaxVelocity(maxVelocities_2);
+					joint_task_2->_otg->setMaxAcceleration(2*M_PI);
+					
+					state2 = RETURN_AND_POSE;
+				}
+			}
+			break;
+
+			case RETURN_AND_POSE: {
+				cout<<"RETURN_AND_POSE 2\n\r";
+				// compute torques
+				joint_task_2->computeTorques(joint_task_torques_2);
+
+				command_torques_2 = joint_task_torques_2;// + posori_task_torques;
+				// based on ball condition determine the robot state
+				if (state != INITIALIZING){
+					if(ball_v(1)<0 && ball_p(1)<4 && ball_p(1) > robot->_q(1)-6.0){
+						//state = MOVE_AND_SWING;
+						//hittingBool = true;
+						//hitting_spot(ball_p.head(3), ball_v.head(3), HITZ, {robot->_q(0),robot->_q(1)-5.0}, {0., 5.0}, 2.0, hit_param);
+						//joint_task->_desired_position(0) = hit_param[0] - BASE_HIT_OFF_X;
+						//joint_task->_desired_position(1) = hit_param[1] + 5.0 - BASE_HIT_OFF_Y;
+
+
+
+
+					} else {
+						 state2 = RETURN_AND_POSE;
+						// joint_task->_kp = 200.0;
+						//q_init_desired(0) = -0.5;
+						//q_init_desired(1) = 0;
+					}
+				}
+			}
+			break;
+		}
+
 
 
 
 
 
 		if (controller_counter %10 == 0 || enforcedCommand) {
+			//cout << command_torques_2 << "\n\r";
 			redis_client.setEigenMatrixJSON(JOINT_TORQUES_COMMANDED_KEY, command_torques);
+			redis_client.setEigenMatrixJSON(JOINT_TORQUES_COMMANDED_KEY_2, command_torques_2);
 			enforcedCommand = false;
 		}
 		

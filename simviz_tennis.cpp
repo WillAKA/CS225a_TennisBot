@@ -22,7 +22,9 @@ using namespace Eigen;
 
 const string world_file = "./resources/world.urdf";
 const string robot_file = "./resources/mmp_panda.urdf";
+const string robot_file_2 = "./resources/mmp_panda.urdf";
 const string robot_name = "mmp_panda";
+const string robot_name_2 = "mmp_panda_2";
 const string obj_file = "./resources/tennisBall.urdf";
 const string obj_name = "ball"; 
 const string camera_name = "camera_fixed";
@@ -32,15 +34,18 @@ const string ee_link_name = "link7";
 // - write:
 const std::string JOINT_ANGLES_KEY = "sai2::cs225a::project::sensors::q";
 const std::string JOINT_VELOCITIES_KEY = "sai2::cs225a::project::sensors::dq";
+const std::string JOINT_ANGLES_KEY_2 = "sai2::cs225a::project2::sensors::q";
+const std::string JOINT_VELOCITIES_KEY_2 = "sai2::cs225a::project2::sensors::dq";
 const std::string OBJ_POSITION_KEY  = "cs225a::robot::ball::sensors::q";
 const std::string OBJ_VELOCITIES_KEY = "cs225a::robot::ball::sensors::dq";
 // - read
 const std::string JOINT_TORQUES_COMMANDED_KEY = "sai2::cs225a::project::actuators::fgc";
+const std::string JOINT_TORQUES_COMMANDED_KEY_2 = "sai2::cs225a::project2::actuators::fgc";
 
 RedisClient redis_client;
 
 // simulation function prototype
-void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* object, Simulation::Sai2Simulation* sim, UIForceWidget *ui_force_widget);
+void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* object, Simulation::Sai2Simulation* sim, UIForceWidget *ui_force_widget, Sai2Model::Sai2Model* robot2);
 
 // callback to print glfw errors
 void glfwError(int error, const char* description);
@@ -94,6 +99,9 @@ int main() {
 	auto robot = new Sai2Model::Sai2Model(robot_file, false);
 	robot->updateKinematics();
 
+	auto robot2 = new Sai2Model::Sai2Model(robot_file_2, false);
+	robot2->updateKinematics();
+
 	// load robot objects
 	auto object = new Sai2Model::Sai2Model(obj_file, false);
 	object->_q(0) = 0.0;
@@ -119,6 +127,10 @@ int main() {
 	sim->getJointPositions(robot_name, robot->_q);
 	sim->getJointVelocities(robot_name, robot->_dq);
 	robot->updateKinematics();
+
+	sim->getJointPositions(robot_name_2, robot2->_q);
+	sim->getJointVelocities(robot_name_2, robot2->_dq);
+	robot2->updateKinematics();
 
 	redis_client.setEigenMatrixJSON(OBJ_POSITION_KEY, object->_q);
 	redis_client.setEigenMatrixJSON(OBJ_VELOCITIES_KEY, object->_dq);
@@ -168,7 +180,7 @@ int main() {
 	glewInitialize();
 
 	fSimulationRunning = true;
-	thread sim_thread(simulation, robot, object, sim, ui_force_widget);
+	thread sim_thread(simulation, robot, object, sim, ui_force_widget, robot2);
 	
 	// while window is open:
 	while (!glfwWindowShouldClose(window) && fSimulationRunning)
@@ -177,6 +189,7 @@ int main() {
 		int width, height;
 		glfwGetFramebufferSize(window, &width, &height);
 		graphics->updateGraphics(robot_name, robot);
+		graphics->updateGraphics(robot_name_2, robot2);
 		graphics->updateGraphics(obj_name, object);
 		graphics->render(camera_name, width, height);
 
@@ -307,12 +320,15 @@ int main() {
 }
 
 //------------------------------------------------------------------------------
-void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* object, Simulation::Sai2Simulation* sim, UIForceWidget *ui_force_widget)
+void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* object, Simulation::Sai2Simulation* sim, UIForceWidget *ui_force_widget, Sai2Model::Sai2Model* robot2)
 {
 
 	int dof = robot->dof();
 	VectorXd command_torques = VectorXd::Zero(dof);
 	redis_client.setEigenMatrixJSON(JOINT_TORQUES_COMMANDED_KEY, command_torques);
+
+	VectorXd command_torques_2 = VectorXd::Zero(dof);
+	redis_client.setEigenMatrixJSON(JOINT_TORQUES_COMMANDED_KEY_2, command_torques_2);
 
 	// create a timer
 	LoopTimer timer;
@@ -323,6 +339,7 @@ void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* object, Simul
 
 	// init variables
 	VectorXd g(dof);
+	VectorXd g2(dof);
 
 	Eigen::Vector3d ui_force;
 	ui_force.setZero();
@@ -336,17 +353,22 @@ void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* object, Simul
 
 		// get gravity torques
 		robot->gravityVector(g);
+		robot2->gravityVector(g2);
 
 		// read arm torques from redis and apply to simulated robot
 		command_torques = redis_client.getEigenMatrixJSON(JOINT_TORQUES_COMMANDED_KEY);
+		command_torques_2 = redis_client.getEigenMatrixJSON(JOINT_TORQUES_COMMANDED_KEY_2);
 		
 		ui_force_widget->getUIForce(ui_force);
 		ui_force_widget->getUIJointTorques(ui_force_command_torques);
 
-		if (fRobotLinkSelect)
+		if (fRobotLinkSelect) {
 			sim->setJointTorques(robot_name, command_torques + ui_force_command_torques + g);
-		else
+			sim->setJointTorques(robot_name_2, command_torques_2 + ui_force_command_torques + g2);
+		} else {
 			sim->setJointTorques(robot_name, command_torques + g);
+			sim->setJointTorques(robot_name_2, command_torques_2 + g2);
+		}
 
 		// integrate forward
 		double curr_time = timer.elapsedTime();
@@ -358,6 +380,10 @@ void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* object, Simul
 		sim->getJointVelocities(robot_name, robot->_dq);
 		robot->updateModel();
 
+		sim->getJointPositions(robot_name_2, robot2->_q);
+		sim->getJointVelocities(robot_name_2, robot2->_dq);
+		robot2->updateModel();
+
 		sim->getJointPositions(obj_name, object->_q);
 		sim->getJointVelocities(obj_name, object->_dq);
 		object->updateModel();
@@ -365,6 +391,9 @@ void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* object, Simul
 		// write new robot state to redis
 		redis_client.setEigenMatrixJSON(JOINT_ANGLES_KEY, robot->_q);
 		redis_client.setEigenMatrixJSON(JOINT_VELOCITIES_KEY, robot->_dq);
+
+		redis_client.setEigenMatrixJSON(JOINT_ANGLES_KEY_2, robot2->_q);
+		redis_client.setEigenMatrixJSON(JOINT_VELOCITIES_KEY_2, robot2->_dq);
 
 		// write new object state to redis
 		redis_client.setEigenMatrixJSON(OBJ_POSITION_KEY, object->_q);
