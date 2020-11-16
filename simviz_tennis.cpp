@@ -93,8 +93,8 @@ int main() {
 
 	// setup camera 
 	Eigen::Vector3d camera_pos, camera_lookat, camera_vertical;
-	camera_pos << 0, -9, 3.0;
-	camera_lookat << 0, 0, 0;
+	camera_pos << 0, -15, 6.0;
+	camera_lookat << 0, -4, 0;
 	camera_vertical << 0, 0, 1;
 	graphics->setCameraPose(camera_name, camera_pos, camera_vertical, camera_lookat);
 
@@ -324,7 +324,7 @@ int main() {
 			// double vz = 5.930;	
 
 			// Values taken sort of from some calculations done in comments above and then hand tuned
-			double xbound = 2;
+			double xbound = 1.5;
 			double ylower = 9.0;
 			double yupper = 13.0;
 			double zlower = 5.77;
@@ -346,6 +346,8 @@ int main() {
 			// object->_dq(2) = 2.0 + 0.005*(rand()%100);
 
 			// Ball 
+			object->_q(0) = 0.0;
+			object->_q(1) = 0.0; 
 			object->_q(2) = -0.1; // z height position
 			object->_dq(0) = xrange;  // x velocity
 			object->_dq(1) = yrange;  // y velocity

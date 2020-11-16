@@ -150,7 +150,6 @@ void hitting_spot(Vector3d ball_p, Vector3d ball_v, double hit_z, pair<double, d
 	// t_hit_land: the time it takes from hit to land
 	double y0 = potential_hit_spots[index].first.second;
 	double yd = land.second;
-	cout<<"t_hit delta: " << 2*(yd-y0)*(yd*hit_z-(yd-y0)*z_at_net)/(G*y0*yd)<<endl;
 	double t_hit_land = sqrt(2*(yd-y0)*(yd*hit_z-(yd-y0)*z_at_net)/(G*y0*yd));
 	double vox = (land.first - potential_hit_spots[index].first.first)/t_hit_land; // v out x
 	double voy = (land.second- potential_hit_spots[index].first.second)/t_hit_land;// v out y
@@ -278,8 +277,8 @@ int main() {
 		if(count % 2 == 0) // collect the ball position and velocity every 5 ms
 		{
 			ball_p = redis_client.getEigenMatrixJSON(OBJ_POSITION_KEY);
-			ball_p(1) += 5.0;
-			ball_p(2) += 2.0;
+			ball_p(1) += 9.0;
+			ball_p(2) += 0.7;
 			ball_v = redis_client.getEigenMatrixJSON(OBJ_VELOCITIES_KEY);
 		}
 
@@ -293,7 +292,7 @@ int main() {
 	
 		// based on ball condition determine the robot state
 		if (state != INITIALIZING){
-			if(ball_v(1)<0 && ball_p(1)<6 && ball_p(1) > robot->_q(1)-6.0){
+			if(ball_v(1)<0 && ball_p(1)<6 && ball_p(1) > robot->_q(1)-10.0){
 				state = MOVE_AND_SWING;
 			} else state = RETURN_AND_POSE;
 		}
@@ -348,14 +347,14 @@ int main() {
 
 			case MOVE_AND_SWING: {
 				cout<<"MOVE_AND_SWING\n\r";
-				hitting_spot(ball_p.head(3), ball_v.head(3), HITZ, {robot->_q(0),robot->_q(1)-5.0}, {4.0, 5.0}, 2.0, hit_param);
+				hitting_spot(ball_p.head(3), ball_v.head(3), HITZ, {robot->_q(0),robot->_q(1)-9.0}, {-0.0, 5.0}, 2.5, hit_param);
 				cout << "x: " << hit_param[0] << "y: " << hit_param[1] << " swing_speed: " << hit_param[2] << " theta1: " << hit_param[3] << " theta2: " << hit_param[4] << " time: " << hit_param[5];
 
 				joint_task->_desired_position(0) = hit_param[0] - BASE_HIT_OFF_X;
-				joint_task->_desired_position(1) = hit_param[1] + 5.0 - BASE_HIT_OFF_Y;
+				joint_task->_desired_position(1) = hit_param[1] + 9.0 - BASE_HIT_OFF_Y;
 				joint_task->_desired_position(7) = -2.50965+hit_param[4];
 
-				if(hit_param[5] > 0 && hit_param[5] < 0.16+(0.4-hit_param[3])/hit_param[2]){
+				if(hit_param[5] > 0 && hit_param[5] < 0.18+(0.3-hit_param[3])/hit_param[2]){
 					// joint_task->_use_interpolation_flag = true;
 					cout << "swing speed!" << hit_param[2]<< " ";
 					joint_task->_desired_position(3) = 1;
@@ -363,7 +362,7 @@ int main() {
 					joint_task->_kp = 2000.0;
 					joint_task->_kv = 50.0;
 					VectorXd maxVelocities = VectorXd::Zero(dof);
-					maxVelocities << 2.0, 2.0, M_PI/3, hit_param[2]/0.75, M_PI/3, M_PI/3,M_PI/3,3*M_PI/3,M_PI/3,M_PI/3;
+					maxVelocities << 3.0, 3.0, M_PI/3, hit_param[2]/0.75, M_PI/3, M_PI/3,M_PI/3,3*M_PI/3,M_PI/3,M_PI/3;
 					joint_task->_otg->setMaxVelocity(maxVelocities);
 					joint_task->_otg->setMaxAcceleration(20*M_PI);
 					// joint_task->_desired_velocity(3) = hit_param[2]/swing_arm_length;
