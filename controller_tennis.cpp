@@ -28,7 +28,7 @@ const string robot_file_2 = "./resources/mmp_panda.urdf";
           
 #define G 9.81
 #define HITZ 1.0
-#define BASE_HIT_OFF_X      0.75
+#define BASE_HIT_OFF_X      0.8
 #define BASE_HIT_OFF_Y      0.0
 
 double swing_arm_length = BASE_HIT_OFF_X;
@@ -173,7 +173,8 @@ int main() {
 	LoopTimer timer;
 	timer.initializeTimer();
 	timer.setLoopFrequency(1000); 
-	double start_time = timer.elapsedTime(); //secs
+	double time_slowdown_factor = 1.0;
+	double start_time = timer.elapsedTime() / time_slowdown_factor; //secs
 	bool fTimerDidSleep = true;
 
 	// Testing code
@@ -195,7 +196,7 @@ int main() {
 		
 
 		timer.waitForNextLoop();
-		double time = timer.elapsedTime() - start_time;
+		double time = timer.elapsedTime() / time_slowdown_factor - start_time;
 
 
 		// wait for next scheduled loop
@@ -449,7 +450,7 @@ int main() {
 				//cout <<"y: " << hit_param_2[1] << "  swing_speed: " << hit_param_2[2] << " theta1: " << hit_param_2[3] << " theta2: " << hit_param_2[4] << " time: " << hit_param_2[5];
 
 				joint_task_2->_desired_position(0) = -hit_param_2[0] - BASE_HIT_OFF_X;
-				joint_task_2->_desired_position(1) = hit_param_2[1] - 5  - BASE_HIT_OFF_Y;
+				joint_task_2->_desired_position(1) = 5-hit_param_2[1]  - BASE_HIT_OFF_Y;
 				
 				//cout << "Hello, parameters here\n\r";
 				//cout << hit_param[2] << "\n\r";				
@@ -458,7 +459,7 @@ int main() {
 				//cout << hit_param_2[1] << "\n\r";
 				//cout << hit_param_2[5] << "\n\r";
 
-				/*if(hit_param_2[5] > 0 && hit_param_2[5] < 0.15 && hittingBool2){
+				if(hit_param_2[5] > 0 && hit_param_2[5] < 0.15 && hittingBool2){
 					cout << "HITTING\n\r";
 					joint_task_2->_use_interpolation_flag = true;
 					// cout << "swing speed!" << hit_param[2]<< " ";
@@ -476,7 +477,7 @@ int main() {
 
 
 					// joint_task->_desired_velocity(3) = hit_param[2]/swing_arm_length;
-				}*/
+				}
 
 				//joint_task_2->updateTaskModel(N_prec_2);
 
@@ -487,14 +488,14 @@ int main() {
 				command_torques_2 = joint_task_torques_2;
 
 				if (state2 != INITIALIZING){
-					if(ball_v(1)>0 && ball_p(1)>-6 && (ball_p(1) < (robot2->_q(1)+6.0))){
+					if(ball_v(1)>0 && ball_p(1)>-6 && ball_p(1)<15){//(ball_p(1) < (robot2->_q(1)+5.0))
 						
 						state2 = MOVE_AND_SWING;
 					} else {
 						//enforcedCommand = true;
 						joint_task_2->_use_interpolation_flag = true;
 						joint_task_2->_desired_position(0) = -0.5;
-						joint_task_2->_desired_position(1) = 0.0;
+						joint_task_2->_desired_position(1) = -0.0;
 						joint_task_2->_desired_position(3) = -1.0;
 						//joint_task->_kp = 250.0;
 						//joint_task->_kv = 50.0;
@@ -521,9 +522,9 @@ int main() {
 					if(ball_v(1)>0 && ball_p(1)>-6 && ball_p(1) < robot2->_q(1)+6.0){
 						state2 = MOVE_AND_SWING;
 						hittingBool2 = true;
-						hitting_spot_inverse(ball_p.head(3), ball_v.head(3), HITZ, {robot2->_q(0),robot2->_q(1)-5.0}, {0., -5.0}, 2.0, hit_param_2);
+						hitting_spot_inverse(ball_p.head(3), ball_v.head(3), HITZ, {robot2->_q(0),robot2->_q(1)+5.0}, {0., -5.0}, 2.0, hit_param_2);
 						joint_task_2->_desired_position(0) = -hit_param_2[0] - BASE_HIT_OFF_X;
-						joint_task_2->_desired_position(1) = hit_param_2[1] + 5.0 - BASE_HIT_OFF_Y;
+						joint_task_2->_desired_position(1) = hit_param_2[1] - 5.0 - BASE_HIT_OFF_Y;
 
 
 
@@ -544,7 +545,7 @@ int main() {
 
 
 
-		if (controller_counter %15 == 0 || enforcedCommand) {
+		if (controller_counter %10 == 0 || enforcedCommand) {
 			//cout << command_torques_2 << "\n\r";
 			
 			#ifdef disableRobot1
@@ -563,7 +564,7 @@ int main() {
 		controller_counter++;
 	}
 
-	double end_time = timer.elapsedTime();
+	double end_time = timer.elapsedTime() / time_slowdown_factor;
     std::cout << "\n";
     std::cout << "Controller Loop run time  : " << end_time << " seconds\n";
     std::cout << "Controller Loop updates   : " << timer.elapsedCycles() << "\n";

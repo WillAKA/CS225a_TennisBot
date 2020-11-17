@@ -189,8 +189,8 @@
     </inertial>
     <visual>
       <geometry>
-        <!--<mesh filename="../../../CS225a_TennisBot/Objects/Visual/TennisRacquet.obj"/>-->
-	<mesh filename="../../../CS225a_TennisBot/Objects/Visual/CollisionMeshRacquetBasic.obj"/>
+        <mesh filename="../../../CS225a_TennisBot/Objects/Visual/TennisRacquet.obj"/>
+	<!--<mesh filename="../../../CS225a_TennisBot/Objects/Visual/CollisionMeshRacquetBasic.obj"/>-->
 	<!--<box size="0.25 1.5 0.0002" />-->
       </geometry>
     </visual>

@@ -260,7 +260,7 @@ int main() {
 			camera_pos = camera_lookat + m_pan*(camera_pos - camera_lookat);
 		}
 		graphics->setCameraPose(camera_name, camera_pos, cam_up_axis, camera_lookat);
-		graphics->getCamera(camera_name)->setClippingPlanes(5,20);
+		graphics->getCamera(camera_name)->setClippingPlanes(2,20);
 		glfwGetCursorPos(window, &last_cursorx, &last_cursory);
 
 		ui_force_widget->setEnable(fRobotLinkSelect);
@@ -291,10 +291,10 @@ int main() {
 		if(fToss) // retoss a ball
 		{
 			object->_q(0) = 0.0;
-			object->_q(1) = 0.0;
+			object->_q(1) = .0;
 			object->_q(2) = 0.0;
-			object->_dq(0) = -.5+0.01*(rand()%150);
-			object->_dq(1) = -9.0+0.02*(rand()%100);
+			object->_dq(0) = +0.05;//-.5+0.01*(rand()%150);
+			object->_dq(1) = -7.9;//-9.0+0.02*(rand()%100); // 7.9 is a good value
 			object->_dq(2) = 2.0;
 			object->_dq(3) = 0.0; // x spin
 			object->_dq(4) = 0.0; // x spin
@@ -334,7 +334,10 @@ void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* object, Simul
 	LoopTimer timer;
 	timer.initializeTimer();
 	timer.setLoopFrequency(1000); 
-	double last_time = timer.elapsedTime(); //secs
+	double time_slowdown_factor = 1.0;
+	double start_time= timer.elapsedTime() / time_slowdown_factor;
+	double last_time = start_time;
+	//double last_time = timer.elapsedTime(); //secs
 	bool fTimerDidSleep = true;
 
 	// init variables
@@ -371,7 +374,8 @@ void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* object, Simul
 		}
 
 		// integrate forward
-		double curr_time = timer.elapsedTime();
+		//double curr_time = timer.elapsedTime();
+		double curr_time = timer.elapsedTime() / time_slowdown_factor;
 		double loop_dt = curr_time - last_time; 
 		sim->integrate(loop_dt);
 
@@ -409,7 +413,7 @@ void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* object, Simul
 		last_time = curr_time;
 	}
 
-	double end_time = timer.elapsedTime();
+	double end_time = timer.elapsedTime() / time_slowdown_factor;
 	std::cout << "\n";
 	std::cout << "Simulation Loop run time  : " << end_time << " seconds\n";
 	std::cout << "Simulation Loop updates   : " << timer.elapsedCycles() << "\n";
