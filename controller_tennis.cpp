@@ -28,13 +28,17 @@ const string robot_file_2 = "./resources/mmp_panda.urdf";
           
 #define G 9.81
 #define HITZ 1.0
-#define BASE_HIT_OFF_X      0.8
+#define BASE_HIT_OFF_X      0.75
 #define BASE_HIT_OFF_Y      0.0
 
 double swing_arm_length = BASE_HIT_OFF_X;
 
 int state = INITIALIZING;
 int state2 = INITIALIZING;
+
+// Testing commands
+//#define disableRobot1
+//#define disableRobot2
 
 // redis keys:
 // - read:
@@ -58,138 +62,11 @@ unsigned long long controller_counter = 0;
 
 const bool inertia_regularization = true;
 
-void hitting_spot(Vector3d ball_p, Vector3d ball_v, double hit_z, pair<double, double> r_p, pair<double, double> land, double z_at_net, double* hit_param){
-	// given the ball position and velocity, and the height of hit position, 
-	// returning the x and y position where the ball will be at (where the robot needs to go to)
+void hitting_spot_inverse(Vector3d ball_p, Vector3d ball_v, double hit_z, pair<double, double> r_p, pair<double, double> land, double z_at_net, double* hit_param);
 
-	// Implementation: calculate 1-3 potential hit positions and select the one which requires smallest speed to get to
-	double restitution_vertical = 0.75;
-	double restitution_horizontal = 0.6;
+void hitting_spot(Vector3d ball_p, Vector3d ball_v, double hit_z, pair<double, double> r_p, pair<double, double> land, double z_at_net, double* hit_param);
 
-	vector<pair<pair<double, double>,double>> potential_hit_spots;
-	vector<double> required_speeds;
 
-	double delta = sqrt(pow(ball_v(2,0),2)+2*G*ball_p(2,0));
-	
-	// two time points when the ball hit the ground
-	double t1 = (ball_v(2)-delta)/G;
-	double t2 = (ball_v(2)+delta)/G;
-
-	double h_x, h_y;
-
-	// first see if it has already bounced once in its half court
-	if(ball_p(1)+t1*ball_v(1)>0){
-		// not yet bounced in its half court
-		delta = sqrt(pow(ball_v(2),2)+2*G*(ball_p(2)-hit_z)); // TO DO: what if delta is imaginary
-		// time point when the ball is at hit_z
-		double t = (ball_v(2)+delta)/G;
-		
-		if(t>0){
-			h_x = ball_v(0)*t+ball_p(0);
-			h_y = ball_v(1)*t+ball_p(1);
-			potential_hit_spots.push_back({{h_x, h_y},t});
-			required_speeds.push_back((pow(r_p.first-h_x,2)+pow(r_p.second-h_y,2))/t);
-		}
-		// then add two more points after bouncing:
-		// using the point where it hits the ground:
-		Vector3d ball_p_after, ball_v_after;
-		ball_p_after << ball_p(0)+ball_v(0)*t2, ball_p(1)+ball_v(1)*t2, 0;
-		ball_v_after << restitution_horizontal*ball_v(0), restitution_horizontal*ball_v(1), restitution_vertical*(-ball_v(2)+G*t2);
-		double delta_after = sqrt(pow(ball_v_after(2),2)+2*G*(ball_p_after(2)-hit_z));
-		double t1_after = (ball_v_after(2)-delta_after)/G;
-		double t2_after = (ball_v_after(2)+delta_after)/G;
-
-		h_x = ball_v_after(0)*t1_after+ball_p_after(0);
-		h_y = ball_v_after(1)*t1_after+ball_p_after(1);
-		potential_hit_spots.push_back({{h_x, h_y},t2+t1_after});
-		required_speeds.push_back((pow(r_p.first-h_x,2)+pow(r_p.second-h_y,2))/(t2+t1_after));
-
-		h_x = ball_v_after(0)*t2_after+ball_p_after(0);
-		h_y = ball_v_after(1)*t2_after+ball_p_after(1);
-		potential_hit_spots.push_back({{h_x, h_y}, t2+t2_after});
-		required_speeds.push_back((pow(r_p.first-h_x,2)+pow(r_p.second-h_y,2))/(t2+t2_after));
-	} else{
-		// already bounced once in its half court
-		delta = sqrt(pow(ball_v(2),2)+2*G*(ball_p(2)-hit_z));
-		t1 = (ball_v(2)-delta)/G;
-		t2 = (ball_v(2)+delta)/G;
-
-		if(t1 > 0){
-			h_x = ball_v(0)*t1+ball_p(0);
-			h_y = ball_v(1)*t1+ball_p(1);
-			potential_hit_spots.push_back({{h_x, h_y}, t1});
-			required_speeds.push_back((pow(r_p.first-h_x,2)+pow(r_p.second-h_y,2))/t1);
-		}
-
-		if(t2 > 0){
-			h_x = ball_v(0)*t2+ball_p(0);
-			h_y = ball_v(1)*t2+ball_p(1);
-			potential_hit_spots.push_back({{h_x, h_y}, t2});
-			required_speeds.push_back((pow(r_p.first-h_x,2)+pow(r_p.second-h_y,2))/t2);
-		}
-	}
-	int index=-1;
-	int speed_min = 100000;
-	for(int i=0; i<required_speeds.size();i++){
-		if(required_speeds[i]<speed_min){
-			index = i;
-			speed_min = required_speeds[i];
-		}
-	}
-	if(index == -1){
-		// no hitable point
-		hit_param[0] = r_p.first+BASE_HIT_OFF_X;
-		hit_param[1] = r_p.second+BASE_HIT_OFF_Y;
-		hit_param[2] = -1;
-		hit_param[3] = -1;
-		hit_param[4] = -1;
-		hit_param[5] = -1;
-		return;
-	} else{
-		hit_param[0] = potential_hit_spots[index].first.first;
-		hit_param[1] = potential_hit_spots[index].first.second;
-	    	hit_param[5] = potential_hit_spots[index].second;
-	}
-
-	// Now calculate parameters related to swing speed and orientation.
-	// t_hit_land: the time it takes from hit to land
-	double y0 = potential_hit_spots[index].first.second;
-	double yd = land.second;
-	double t_hit_land = sqrt(2*(yd-y0)*(yd*hit_z-(yd-y0)*z_at_net)/(G*y0*yd));
-	double vox = (land.first - potential_hit_spots[index].first.first)/t_hit_land; // v out x
-	double voy = (land.second- potential_hit_spots[index].first.second)/t_hit_land;// v out y
-	double voz = 0.5*G*t_hit_land-hit_z/t_hit_land;										   // v out z
-
-	// neglecting spin for now, assume after hitting, the normal relative speed is scaled by alpha1 
-	// and the parallel relative speed is scaled by alpha2 
-	double alpha1 = 0.7;
-	double alpha2 = 0.9;
-
-	double approx_alpha_square = 0.75*0.75; // first parameter to tune, value should be 0.7^2 to 0.8^2 : in the racket frame, assume |v_out| = approx_alpha * |v_in|
-	double a = 1 - approx_alpha_square;
-	double b = 2*approx_alpha_square*ball_v(1)-2*voy;
-	double c = vox*vox+voy*voy+voz*voz-approx_alpha_square*(ball_v(0)*ball_v(0)+ball_v(1)*ball_v(1)+ball_v(2)*ball_v(2));
-	double sqrt_delta = sqrt(b*b-4*a*c);
-	if(b*b-4*a*c<0){
-		cout << "ERROR: NO swing speed" << endl;
-	}
-	double swing_speed = (-b - sqrt_delta)/(2*a);
-	if(swing_speed < 0){
-		swing_speed = (-b + sqrt_delta)/(2*a);
-	}
-	hit_param[2] = swing_speed;
-
-	double ratio = 0.5; // second parameter to tune, hard to explain, value should be near 0.5 (0.4-0.6 maybe)
-
-	// normal vector
-	double nx = vox*(1-ratio)-ratio*ball_v(0);
-	double ny = (voy-swing_speed)*(1-ratio)-ratio*(ball_v(1)-swing_speed);
-	double nz = voz*(1-ratio)-ratio*ball_v(2);
-
-	hit_param[3] = atan(nx/ny);
-	hit_param[4] = atan(nz/sqrt(nx*nx+ny*ny));	
-	return;
-}
 
 int main() {
 	JOINT_ANGLES_KEY = "sai2::cs225a::project::sensors::q";
@@ -305,6 +182,7 @@ int main() {
 	int count = 0;
 	// pair<double,double> hit_point;
 	double hit_param[6]; // x,y,speed, theta1, theta2, time
+	double hit_param_2[6]; // x,y,speed, theta1, theta2, time
 
 	bool hittingBool = true;
 	bool hittingBool2 = true;
@@ -459,8 +337,8 @@ int main() {
 						joint_task->_desired_position(0) = -0.5;
 						joint_task->_desired_position(1) = 0.0;
 						joint_task->_desired_position(3) = -1.0;
-						joint_task->_kp = 250.0;
-						joint_task->_kv = 50.0;
+						//joint_task->_kp = 250.0;
+						//joint_task->_kv = 50.0;
 						VectorXd maxVelocities = VectorXd::Zero(dof);
 						maxVelocities << 6*M_PI/3,6*M_PI/3,M_PI/3,5*M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3;
 						joint_task->_otg->setMaxVelocity(maxVelocities);
@@ -542,7 +420,7 @@ int main() {
 					joint_task_2->_desired_position(1) = 0.0;
 					joint_task_2->_desired_position(3) = -1.0;
 
-					hitJointPos = joint_task->_desired_position;
+					//hitJointPos = joint_task->_desired_position;
 					
 					//joint_task->_desired_position(7) = hitJointPos(7)+45.0*M_PI/180;
 					//joint_task->_desired_position(8) = -0.0;
@@ -564,20 +442,88 @@ int main() {
 			}
 			break;
 
+			case MOVE_AND_SWING: {
+				//cout<<"MOVE_AND_SWING_2\n\r";
+				hitting_spot_inverse(ball_p.head(3), ball_v.head(3), HITZ, {robot2->_q(0),robot2->_q(1)+5.0}, {0., -5.0}, 2.0, hit_param_2);
+				//cout << "x: " << hit_param_2[0] << "  X moved: " << -hit_param_2[0] - BASE_HIT_OFF_X;
+				//cout <<"y: " << hit_param_2[1] << "  swing_speed: " << hit_param_2[2] << " theta1: " << hit_param_2[3] << " theta2: " << hit_param_2[4] << " time: " << hit_param_2[5];
+
+				joint_task_2->_desired_position(0) = -hit_param_2[0] - BASE_HIT_OFF_X;
+				joint_task_2->_desired_position(1) = hit_param_2[1] - 5  - BASE_HIT_OFF_Y;
+				
+				//cout << "Hello, parameters here\n\r";
+				//cout << hit_param[2] << "\n\r";				
+				//cout << hit_param[3]*180/M_PI << "\n\r";
+				//cout << hit_param[4]*180/M_PI << "\n\r\n\r";
+				//cout << hit_param_2[1] << "\n\r";
+				//cout << hit_param_2[5] << "\n\r";
+
+				/*if(hit_param_2[5] > 0 && hit_param_2[5] < 0.15 && hittingBool2){
+					cout << "HITTING\n\r";
+					joint_task_2->_use_interpolation_flag = true;
+					// cout << "swing speed!" << hit_param[2]<< " ";
+					joint_task_2->_desired_position(3) = 0.0;
+					hittingBool2 = false;
+					//enforcedCommand = true;
+
+
+					joint_task_2->_kp = 2000.0;
+					joint_task_2->_kv = 50.0;
+					VectorXd maxVelocities_2 = VectorXd::Zero(dof);
+					maxVelocities_2 << 6*M_PI/3,6*M_PI/3,M_PI/3,10*M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3;
+					joint_task_2->_otg->setMaxVelocity(maxVelocities_2);
+					joint_task_2->_otg->setMaxAcceleration(20*M_PI);
+
+
+					// joint_task->_desired_velocity(3) = hit_param[2]/swing_arm_length;
+				}*/
+
+				//joint_task_2->updateTaskModel(N_prec_2);
+
+				joint_task_2->computeTorques(joint_task_torques_2);
+
+				// cout << "joint_task_torques.size()" << joint_task_torques.size() << endl;
+				// cout << joint_task_torques(0) << " " << joint_task_torques(1) << " " << joint_task_torques(2) << " " << joint_task_torques(3) <<endl;
+				command_torques_2 = joint_task_torques_2;
+
+				if (state2 != INITIALIZING){
+					if(ball_v(1)>0 && ball_p(1)>-6 && (ball_p(1) < (robot2->_q(1)+6.0))){
+						
+						state2 = MOVE_AND_SWING;
+					} else {
+						//enforcedCommand = true;
+						joint_task_2->_use_interpolation_flag = true;
+						joint_task_2->_desired_position(0) = -0.5;
+						joint_task_2->_desired_position(1) = 0.0;
+						joint_task_2->_desired_position(3) = -1.0;
+						//joint_task->_kp = 250.0;
+						//joint_task->_kv = 50.0;
+						VectorXd maxVelocities_2 = VectorXd::Zero(dof);
+						maxVelocities_2 << 6*M_PI/3,6*M_PI/3,M_PI/3,5*M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3;
+						joint_task_2->_otg->setMaxVelocity(maxVelocities_2);
+						joint_task_2->_otg->setMaxAcceleration(2*M_PI);
+
+
+						state2 = RETURN_AND_POSE;
+					}
+				}
+			}
+			break;
+
 			case RETURN_AND_POSE: {
-				cout<<"RETURN_AND_POSE 2\n\r";
+				//cout<<"RETURN_AND_POSE 2\n\r";
 				// compute torques
 				joint_task_2->computeTorques(joint_task_torques_2);
 
 				command_torques_2 = joint_task_torques_2;// + posori_task_torques;
 				// based on ball condition determine the robot state
-				if (state != INITIALIZING){
-					if(ball_v(1)<0 && ball_p(1)<4 && ball_p(1) > robot->_q(1)-6.0){
-						//state = MOVE_AND_SWING;
-						//hittingBool = true;
-						//hitting_spot(ball_p.head(3), ball_v.head(3), HITZ, {robot->_q(0),robot->_q(1)-5.0}, {0., 5.0}, 2.0, hit_param);
-						//joint_task->_desired_position(0) = hit_param[0] - BASE_HIT_OFF_X;
-						//joint_task->_desired_position(1) = hit_param[1] + 5.0 - BASE_HIT_OFF_Y;
+				if (state2 != INITIALIZING){
+					if(ball_v(1)>0 && ball_p(1)>-6 && ball_p(1) < robot2->_q(1)+6.0){
+						state2 = MOVE_AND_SWING;
+						hittingBool2 = true;
+						hitting_spot_inverse(ball_p.head(3), ball_v.head(3), HITZ, {robot2->_q(0),robot2->_q(1)-5.0}, {0., -5.0}, 2.0, hit_param_2);
+						joint_task_2->_desired_position(0) = -hit_param_2[0] - BASE_HIT_OFF_X;
+						joint_task_2->_desired_position(1) = hit_param_2[1] + 5.0 - BASE_HIT_OFF_Y;
 
 
 
@@ -598,8 +544,16 @@ int main() {
 
 
 
-		if (controller_counter %10 == 0 || enforcedCommand) {
+		if (controller_counter %15 == 0 || enforcedCommand) {
 			//cout << command_torques_2 << "\n\r";
+			
+			#ifdef disableRobot1
+				command_torques.setZero();
+			#endif 
+			#ifdef disableRobot2
+				command_torques_2.setZero();
+			#endif
+
 			redis_client.setEigenMatrixJSON(JOINT_TORQUES_COMMANDED_KEY, command_torques);
 			redis_client.setEigenMatrixJSON(JOINT_TORQUES_COMMANDED_KEY_2, command_torques_2);
 			enforcedCommand = false;
@@ -617,3 +571,281 @@ int main() {
 
 	return 0;
 }
+
+
+
+
+
+
+/*
+Helper Functions
+*/
+
+void hitting_spot_inverse(Vector3d ball_p, Vector3d ball_v, double hit_z, pair<double, double> r_p, pair<double, double> land, double z_at_net, double* hit_param){
+	// given the ball position and velocity, and the height of hit position, 
+	// returning the x and y position where the ball will be at (where the robot needs to go to)
+
+	// Implementation: calculate 1-3 potential hit positions and select the one which requires smallest speed to get to
+	double restitution_vertical = 0.75;
+	double restitution_horizontal = 0.6;
+
+	vector<pair<pair<double, double>,double>> potential_hit_spots;
+	vector<double> required_speeds;
+
+	double delta = sqrt(pow(ball_v(2,0),2)+2*G*ball_p(2,0));
+	
+	// two time points when the ball hit the ground
+	double t1 = (ball_v(2)-delta)/G;
+	double t2 = (ball_v(2)+delta)/G;
+
+	double h_x, h_y;
+
+	// first see if it has already bounced once in its half court
+	if(ball_p(1)+t1*ball_v(1)<0){
+		// not yet bounced in its half court
+		delta = sqrt(pow(ball_v(2),2)+2*G*(ball_p(2)-hit_z)); // TO DO: what if delta is imaginary
+		// time point when the ball is at hit_z
+		double t = (ball_v(2)+delta)/G;
+		
+		if(t>0){
+			h_x = ball_v(0)*t+ball_p(0);
+			h_y = ball_v(1)*t+ball_p(1);
+			potential_hit_spots.push_back({{h_x, h_y},t});
+			required_speeds.push_back((pow(r_p.first-h_x,2)+pow(r_p.second-h_y,2))/t);
+		}
+		// then add two more points after bouncing:
+		// using the point where it hits the ground:
+		Vector3d ball_p_after, ball_v_after;
+		ball_p_after << ball_p(0)+ball_v(0)*t2, ball_p(1)+ball_v(1)*t2, 0;
+		ball_v_after << restitution_horizontal*ball_v(0), restitution_horizontal*ball_v(1), restitution_vertical*(-ball_v(2)+G*t2);
+		double delta_after = sqrt(pow(ball_v_after(2),2)+2*G*(ball_p_after(2)-hit_z));
+		double t1_after = (ball_v_after(2)-delta_after)/G;
+		double t2_after = (ball_v_after(2)+delta_after)/G;
+
+		h_x = ball_v_after(0)*t1_after+ball_p_after(0);
+		h_y = ball_v_after(1)*t1_after+ball_p_after(1);
+		potential_hit_spots.push_back({{h_x, h_y},t2+t1_after});
+		required_speeds.push_back((pow(r_p.first-h_x,2)+pow(r_p.second-h_y,2))/(t2+t1_after));
+
+		h_x = ball_v_after(0)*t2_after+ball_p_after(0);
+		h_y = ball_v_after(1)*t2_after+ball_p_after(1);
+		potential_hit_spots.push_back({{h_x, h_y}, t2+t2_after});
+		required_speeds.push_back((pow(r_p.first-h_x,2)+pow(r_p.second-h_y,2))/(t2+t2_after));
+	} else{
+		// already bounced once in its half court
+		delta = sqrt(pow(ball_v(2),2)+2*G*(ball_p(2)-hit_z));
+		t1 = (ball_v(2)-delta)/G;
+		t2 = (ball_v(2)+delta)/G;
+
+		if(t1 > 0){
+			h_x = ball_v(0)*t1+ball_p(0);
+			h_y = ball_v(1)*t1+ball_p(1);
+			potential_hit_spots.push_back({{h_x, h_y}, t1});
+			required_speeds.push_back((pow(r_p.first-h_x,2)+pow(r_p.second-h_y,2))/t1);
+		}
+
+		if(t2 > 0){
+			h_x = ball_v(0)*t2+ball_p(0);
+			h_y = ball_v(1)*t2+ball_p(1);
+			potential_hit_spots.push_back({{h_x, h_y}, t2});
+			required_speeds.push_back((pow(r_p.first-h_x,2)+pow(r_p.second-h_y,2))/t2);
+		}
+	}
+	int index=-1;
+	int speed_min = 100000;
+	for(int i=0; i<required_speeds.size();i++){
+		if(required_speeds[i]<speed_min){
+			index = i;
+			speed_min = required_speeds[i];
+		}
+	}
+	if(index == -1){
+		// no hitable point
+		hit_param[0] = r_p.first+BASE_HIT_OFF_X;
+		hit_param[1] = r_p.second+BASE_HIT_OFF_Y;
+		hit_param[2] = -1;
+		hit_param[3] = -1;
+		hit_param[4] = -1;
+		hit_param[5] = -1;
+		return;
+	} else{
+		hit_param[0] = potential_hit_spots[index].first.first;
+		hit_param[1] = potential_hit_spots[index].first.second;
+	    	hit_param[5] = potential_hit_spots[index].second;
+	}
+
+	// Now calculate parameters related to swing speed and orientation.
+	// t_hit_land: the time it takes from hit to land
+	double y0 = potential_hit_spots[index].first.second;
+	double yd = land.second;
+	double t_hit_land = sqrt(2*(yd-y0)*(yd*hit_z-(yd-y0)*z_at_net)/(G*y0*yd));
+	double vox = (land.first - potential_hit_spots[index].first.first)/t_hit_land; // v out x
+	double voy = (land.second- potential_hit_spots[index].first.second)/t_hit_land;// v out y
+	double voz = 0.5*G*t_hit_land-hit_z/t_hit_land;										   // v out z
+
+	// neglecting spin for now, assume after hitting, the normal relative speed is scaled by alpha1 
+	// and the parallel relative speed is scaled by alpha2 
+	double alpha1 = 0.7;
+	double alpha2 = 0.9;
+
+	double approx_alpha_square = 0.75*0.75; // first parameter to tune, value should be 0.7^2 to 0.8^2 : in the racket frame, assume |v_out| = approx_alpha * |v_in|
+	double a = 1 - approx_alpha_square;
+	double b = 2*approx_alpha_square*ball_v(1)-2*voy;
+	double c = vox*vox+voy*voy+voz*voz-approx_alpha_square*(ball_v(0)*ball_v(0)+ball_v(1)*ball_v(1)+ball_v(2)*ball_v(2));
+	double sqrt_delta = sqrt(b*b-4*a*c);
+	if(b*b-4*a*c<0){
+		cout << "ERROR: NO swing speed" << endl;
+	}
+	double swing_speed = (-b - sqrt_delta)/(2*a);
+	if(swing_speed < 0){
+		swing_speed = (-b + sqrt_delta)/(2*a);
+	}
+	hit_param[2] = swing_speed;
+
+	double ratio = 0.5; // second parameter to tune, hard to explain, value should be near 0.5 (0.4-0.6 maybe)
+
+	// normal vector
+	double nx = vox*(1-ratio)-ratio*ball_v(0);
+	double ny = (voy-swing_speed)*(1-ratio)-ratio*(ball_v(1)-swing_speed);
+	double nz = voz*(1-ratio)-ratio*ball_v(2);
+
+	hit_param[3] = atan(nx/ny);
+	hit_param[4] = atan(nz/sqrt(nx*nx+ny*ny));	
+	return;
+}
+
+
+void hitting_spot(Vector3d ball_p, Vector3d ball_v, double hit_z, pair<double, double> r_p, pair<double, double> land, double z_at_net, double* hit_param){
+	// given the ball position and velocity, and the height of hit position, 
+	// returning the x and y position where the ball will be at (where the robot needs to go to)
+
+	// Implementation: calculate 1-3 potential hit positions and select the one which requires smallest speed to get to
+	double restitution_vertical = 0.75;
+	double restitution_horizontal = 0.6;
+
+	vector<pair<pair<double, double>,double>> potential_hit_spots;
+	vector<double> required_speeds;
+
+	double delta = sqrt(pow(ball_v(2,0),2)+2*G*ball_p(2,0));
+	
+	// two time points when the ball hit the ground
+	double t1 = (ball_v(2)-delta)/G;
+	double t2 = (ball_v(2)+delta)/G;
+
+	double h_x, h_y;
+
+	// first see if it has already bounced once in its half court
+	if(ball_p(1)+t1*ball_v(1)>0){
+		// not yet bounced in its half court
+		delta = sqrt(pow(ball_v(2),2)+2*G*(ball_p(2)-hit_z)); // TO DO: what if delta is imaginary
+		// time point when the ball is at hit_z
+		double t = (ball_v(2)+delta)/G;
+		
+		if(t>0){
+			h_x = ball_v(0)*t+ball_p(0);
+			h_y = ball_v(1)*t+ball_p(1);
+			potential_hit_spots.push_back({{h_x, h_y},t});
+			required_speeds.push_back((pow(r_p.first-h_x,2)+pow(r_p.second-h_y,2))/t);
+		}
+		// then add two more points after bouncing:
+		// using the point where it hits the ground:
+		Vector3d ball_p_after, ball_v_after;
+		ball_p_after << ball_p(0)+ball_v(0)*t2, ball_p(1)+ball_v(1)*t2, 0;
+		ball_v_after << restitution_horizontal*ball_v(0), restitution_horizontal*ball_v(1), restitution_vertical*(-ball_v(2)+G*t2);
+		double delta_after = sqrt(pow(ball_v_after(2),2)+2*G*(ball_p_after(2)-hit_z));
+		double t1_after = (ball_v_after(2)-delta_after)/G;
+		double t2_after = (ball_v_after(2)+delta_after)/G;
+
+		h_x = ball_v_after(0)*t1_after+ball_p_after(0);
+		h_y = ball_v_after(1)*t1_after+ball_p_after(1);
+		potential_hit_spots.push_back({{h_x, h_y},t2+t1_after});
+		required_speeds.push_back((pow(r_p.first-h_x,2)+pow(r_p.second-h_y,2))/(t2+t1_after));
+
+		h_x = ball_v_after(0)*t2_after+ball_p_after(0);
+		h_y = ball_v_after(1)*t2_after+ball_p_after(1);
+		potential_hit_spots.push_back({{h_x, h_y}, t2+t2_after});
+		required_speeds.push_back((pow(r_p.first-h_x,2)+pow(r_p.second-h_y,2))/(t2+t2_after));
+	} else{
+		// already bounced once in its half court
+		delta = sqrt(pow(ball_v(2),2)+2*G*(ball_p(2)-hit_z));
+		t1 = (ball_v(2)-delta)/G;
+		t2 = (ball_v(2)+delta)/G;
+
+		if(t1 > 0){
+			h_x = ball_v(0)*t1+ball_p(0);
+			h_y = ball_v(1)*t1+ball_p(1);
+			potential_hit_spots.push_back({{h_x, h_y}, t1});
+			required_speeds.push_back((pow(r_p.first-h_x,2)+pow(r_p.second-h_y,2))/t1);
+		}
+
+		if(t2 > 0){
+			h_x = ball_v(0)*t2+ball_p(0);
+			h_y = ball_v(1)*t2+ball_p(1);
+			potential_hit_spots.push_back({{h_x, h_y}, t2});
+			required_speeds.push_back((pow(r_p.first-h_x,2)+pow(r_p.second-h_y,2))/t2);
+		}
+	}
+	int index=-1;
+	int speed_min = 100000;
+	for(int i=0; i<required_speeds.size();i++){
+		if(required_speeds[i]<speed_min){
+			index = i;
+			speed_min = required_speeds[i];
+		}
+	}
+	if(index == -1){
+		// no hitable point
+		hit_param[0] = r_p.first+BASE_HIT_OFF_X;
+		hit_param[1] = r_p.second+BASE_HIT_OFF_Y;
+		hit_param[2] = -1;
+		hit_param[3] = -1;
+		hit_param[4] = -1;
+		hit_param[5] = -1;
+		return;
+	} else{
+		hit_param[0] = potential_hit_spots[index].first.first;
+		hit_param[1] = potential_hit_spots[index].first.second;
+	    	hit_param[5] = potential_hit_spots[index].second;
+	}
+
+	// Now calculate parameters related to swing speed and orientation.
+	// t_hit_land: the time it takes from hit to land
+	double y0 = potential_hit_spots[index].first.second;
+	double yd = land.second;
+	double t_hit_land = sqrt(2*(yd-y0)*(yd*hit_z-(yd-y0)*z_at_net)/(G*y0*yd));
+	double vox = (land.first - potential_hit_spots[index].first.first)/t_hit_land; // v out x
+	double voy = (land.second- potential_hit_spots[index].first.second)/t_hit_land;// v out y
+	double voz = 0.5*G*t_hit_land-hit_z/t_hit_land;										   // v out z
+
+	// neglecting spin for now, assume after hitting, the normal relative speed is scaled by alpha1 
+	// and the parallel relative speed is scaled by alpha2 
+	double alpha1 = 0.7;
+	double alpha2 = 0.9;
+
+	double approx_alpha_square = 0.75*0.75; // first parameter to tune, value should be 0.7^2 to 0.8^2 : in the racket frame, assume |v_out| = approx_alpha * |v_in|
+	double a = 1 - approx_alpha_square;
+	double b = 2*approx_alpha_square*ball_v(1)-2*voy;
+	double c = vox*vox+voy*voy+voz*voz-approx_alpha_square*(ball_v(0)*ball_v(0)+ball_v(1)*ball_v(1)+ball_v(2)*ball_v(2));
+	double sqrt_delta = sqrt(b*b-4*a*c);
+	if(b*b-4*a*c<0){
+		cout << "ERROR: NO swing speed" << endl;
+	}
+	double swing_speed = (-b - sqrt_delta)/(2*a);
+	if(swing_speed < 0){
+		swing_speed = (-b + sqrt_delta)/(2*a);
+	}
+	hit_param[2] = swing_speed;
+
+	double ratio = 0.5; // second parameter to tune, hard to explain, value should be near 0.5 (0.4-0.6 maybe)
+
+	// normal vector
+	double nx = vox*(1-ratio)-ratio*ball_v(0);
+	double ny = (voy-swing_speed)*(1-ratio)-ratio*(ball_v(1)-swing_speed);
+	double nz = voz*(1-ratio)-ratio*ball_v(2);
+
+	hit_param[3] = atan(nx/ny);
+	hit_param[4] = atan(nz/sqrt(nx*nx+ny*ny));	
+	return;
+}
+
+
