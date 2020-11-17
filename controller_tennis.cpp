@@ -279,7 +279,7 @@ int main() {
 
 					VectorXd maxVelocities = VectorXd::Zero(dof);
 					maxVelocities << 6*M_PI/3,6*M_PI/3,M_PI/3,5*M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3;
-					joint_task->_otg->setMaxVelocity(maxVelocities);
+					joint_task->_otg->setMaxVelocity(maxVelocities/time_slowdown_factor);
 					joint_task->_otg->setMaxAcceleration(2*M_PI);
 					
 					state = RETURN_AND_POSE;
@@ -300,7 +300,7 @@ int main() {
 				//cout << hit_param[3]*180/M_PI << "\n\r";
 				//cout << hit_param[4]*180/M_PI << "\n\r\n\r";
 
-				if(hit_param[5] > 0 && hit_param[5] < 0.15 && hittingBool){
+				if(hit_param[5] > 0 && hit_param[5] < 0.15/time_slowdown_factor && hittingBool){
 					//cout << "HITTING\n\r";
 					joint_task->_use_interpolation_flag = true;
 					// cout << "swing speed!" << hit_param[2]<< " ";
@@ -313,7 +313,7 @@ int main() {
 					joint_task->_kv = 50.0;
 					VectorXd maxVelocities = VectorXd::Zero(dof);
 					maxVelocities << 6*M_PI/3,6*M_PI/3,M_PI/3,10*M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3;
-					joint_task->_otg->setMaxVelocity(maxVelocities);
+					joint_task->_otg->setMaxVelocity(maxVelocities/time_slowdown_factor);
 					joint_task->_otg->setMaxAcceleration(20*M_PI);
 
 
@@ -342,7 +342,7 @@ int main() {
 						//joint_task->_kv = 50.0;
 						VectorXd maxVelocities = VectorXd::Zero(dof);
 						maxVelocities << 6*M_PI/3,6*M_PI/3,M_PI/3,5*M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3;
-						joint_task->_otg->setMaxVelocity(maxVelocities);
+						joint_task->_otg->setMaxVelocity(maxVelocities/time_slowdown_factor);
 						joint_task->_otg->setMaxAcceleration(2*M_PI);
 
 
@@ -435,7 +435,7 @@ int main() {
 
 					VectorXd maxVelocities_2 = VectorXd::Zero(dof);
 					maxVelocities_2 << 6*M_PI/3,6*M_PI/3,M_PI/3,5*M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3;
-					joint_task_2->_otg->setMaxVelocity(maxVelocities_2);
+					joint_task_2->_otg->setMaxVelocity(maxVelocities_2/time_slowdown_factor);
 					joint_task_2->_otg->setMaxAcceleration(2*M_PI);
 					
 					state2 = RETURN_AND_POSE;
@@ -459,7 +459,7 @@ int main() {
 				//cout << hit_param_2[1] << "\n\r";
 				//cout << hit_param_2[5] << "\n\r";
 
-				if(hit_param_2[5] > 0 && hit_param_2[5] < 0.15 && hittingBool2){
+				if(hit_param_2[5] > 0 && hit_param_2[5] < 0.15/time_slowdown_factor && hittingBool2){
 					cout << "HITTING\n\r";
 					joint_task_2->_use_interpolation_flag = true;
 					// cout << "swing speed!" << hit_param[2]<< " ";
@@ -472,7 +472,7 @@ int main() {
 					joint_task_2->_kv = 50.0;
 					VectorXd maxVelocities_2 = VectorXd::Zero(dof);
 					maxVelocities_2 << 6*M_PI/3,6*M_PI/3,M_PI/3,10*M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3;
-					joint_task_2->_otg->setMaxVelocity(maxVelocities_2);
+					joint_task_2->_otg->setMaxVelocity(maxVelocities_2/time_slowdown_factor);
 					joint_task_2->_otg->setMaxAcceleration(20*M_PI);
 
 
@@ -501,7 +501,7 @@ int main() {
 						//joint_task->_kv = 50.0;
 						VectorXd maxVelocities_2 = VectorXd::Zero(dof);
 						maxVelocities_2 << 6*M_PI/3,6*M_PI/3,M_PI/3,5*M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3;
-						joint_task_2->_otg->setMaxVelocity(maxVelocities_2);
+						joint_task_2->_otg->setMaxVelocity(maxVelocities_2/time_slowdown_factor);
 						joint_task_2->_otg->setMaxAcceleration(2*M_PI);
 
 
