@@ -11,6 +11,7 @@
 #include "force_sensor/ForceSensorDisplay.h"
 
 #include <iostream>
+#include <fstream>
 #include <string>
 
 #include <signal.h>
@@ -97,8 +98,12 @@ int main() {
 	// camera_pos << 0, -15, 6.0;
 	// camera_lookat << 0, -4, 0;
 	// small court:
-	camera_pos << 0, -12, 4.0;
-	camera_lookat << 0, 0, 0;
+	// camera_pos << 0, -12, 4.0;
+	// camera_lookat << 0, 0, 0;
+	// camera_vertical << 0, 0, 1;
+	// From net facing robot
+	camera_pos << 0, 0, 5;
+	camera_lookat << 0, -7, 0;
 	camera_vertical << 0, 0, 1;
 	graphics->setCameraPose(camera_name, camera_pos, camera_vertical, camera_lookat);
 
@@ -197,6 +202,10 @@ int main() {
 
 	// cache variables
 	double last_cursorx, last_cursory;
+
+	// Opens a text file to record data
+	ofstream myfile;
+	myfile.open ("TennisSim.txt");
 
 	// initialize glew
 	glewInitialize();
@@ -389,11 +398,26 @@ int main() {
 			sim->setJointPositions(turret_name, shooter->_q);
 			sim->setJointVelocities(turret_name, shooter->_dq);
 		}
+
+		// Output Variables to the text file
+		for (int i = 0; i < 10; i++){
+			myfile << robot->_q(i) << " , ";
+		}
+		for (int i = 0; i < 6; i++){
+			myfile << object->_q(i) << " , ";
+		}
+		for (int i = 0; i < 6; i++){
+			myfile << shooter->_q(i) << " , ";
+		}
+		myfile << "\n";
 	}
 
 	// stop simulation
 	fSimulationRunning = false;
 	sim_thread.join();
+
+	//close the text file
+	myfile.close();
 
 	// destroy context
 	glfwSetWindowShouldClose(window,GL_TRUE);

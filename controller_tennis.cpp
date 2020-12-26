@@ -300,7 +300,7 @@ int main() {
 
 		switch(state) {
 			case INITIALIZING: {
-				cout << "Initilizing\n\r";
+				// cout << "Initilizing\n\r";
 				N_prec.setIdentity();
 				joint_task->updateTaskModel(N_prec);
 
@@ -333,7 +333,7 @@ int main() {
 					joint_task->_desired_position(0) = -0.5;
 					joint_task->_desired_position(1) = 0.0;
 
-					cout << joint_task->_desired_position << "\n\r";
+					// cout << joint_task->_desired_position << "\n\r";
 					
 					VectorXd maxVelocities = VectorXd::Zero(dof);
 					maxVelocities << 2.0,2.0,M_PI/3,5*M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3,M_PI/3;
@@ -346,9 +346,9 @@ int main() {
 			break;
 
 			case MOVE_AND_SWING: {
-				cout<<"MOVE_AND_SWING\n\r";
+				// cout<<"MOVE_AND_SWING\n\r";
 				hitting_spot(ball_p.head(3), ball_v.head(3), HITZ, {robot->_q(0),robot->_q(1)-6.0}, {5.0, 5.0}, 2.3, hit_param);
-				cout << "x: " << hit_param[0] << "y: " << hit_param[1] << " swing_speed: " << hit_param[2] << " theta1: " << hit_param[3] << " theta2: " << hit_param[4] << " time: " << hit_param[5];
+				// cout << "x: " << hit_param[0] << "y: " << hit_param[1] << " swing_speed: " << hit_param[2] << " theta1: " << hit_param[3] << " theta2: " << hit_param[4] << " time: " << hit_param[5];
 
 				joint_task->_desired_position(0) = hit_param[0] - BASE_HIT_OFF_X;
 				joint_task->_desired_position(1) = hit_param[1] + 6.0 - BASE_HIT_OFF_Y;
@@ -356,7 +356,7 @@ int main() {
 
 				if(hit_param[5] > 0 && hit_param[5] < 0.18+(0.3-hit_param[3])/hit_param[2]){
 					// joint_task->_use_interpolation_flag = true;
-					cout << "swing speed!" << hit_param[2]<< " ";
+					// cout << "swing speed!" << hit_param[2]<< " ";
 					joint_task->_desired_position(3) = 1;
 
 					joint_task->_kp = 2000.0;
@@ -379,7 +379,7 @@ int main() {
 			break;
 
 			case RETURN_AND_POSE: {
-				cout<<"RETURN_AND_POSE\n\r";
+				// cout<<"RETURN_AND_POSE\n\r";
 				// update task model and set hierarchy
 				N_prec.setIdentity();
 				//posori_task->updateTaskModel(N_prec);
@@ -393,7 +393,7 @@ int main() {
 				// compute torques
 				joint_task->computeTorques(joint_task_torques);
 				//posori_task->computeTorques(posori_task_torques);
-				cout << "joint(7): " << robot->_q(7);
+				// cout << "joint(7): " << robot->_q(7);
 				command_torques = joint_task_torques;// + posori_task_torques;
 			}
 			break;
